@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Monitor de Qualidade do Ar</title>
+
+<!-- SheetJS & Plotly -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+  /* ─── Variables ─────────────────────────────────────────── */
+  :root {
+    --bg:        #0D1117;
+    --surface:   #161B22;
+    --surface2:  #1C2333;
+    --border:    #30363D;
+    --text:      #E6EDF3;
+    --muted:     #7D8590;
+    --accent:    #58A6FF;
+    --radius:    10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ─── Header ────────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #58A6FF 0%, #1F6FEB 100%);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 15px; font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+  header p {
+    font-size: 12px; color: var(--muted); margin-top: 1px;
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    background: rgba(88,166,255,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(88,166,255,0.3);
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ─── Main Layout ───────────────────────────────────────── */
+  main { padding: 28px 32px 60px; max-width: 1440px; margin: 0 auto; }
+
+  /* ─── Upload Zone ───────────────────────────────────────── */
+  #upload-section {
+    display: flex; justify-content: center; align-items: center;
+    min-height: calc(100vh - 80px);
+    flex-direction: column; gap: 0;
+  }
+  .upload-card {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 56px 72px;
+    text-align: center;
+    max-width: 520px;
+    width: 100%;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
+  .upload-card:hover, .upload-card.drag { border-color: var(--accent); background: rgba(88,166,255,0.04); }
+  .upload-icon { font-size: 42px; margin-bottom: 16px; filter: grayscale(0.3); }
+  .upload-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .upload-card p { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .upload-card input[type=file] { display: none; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--accent); color: #0D1117;
+    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px;
+    border: none; border-radius: 8px; padding: 10px 22px;
+    cursor: pointer; transition: opacity 0.15s;
+    text-decoration: none;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-outline {
+    background: transparent; color: var(--accent);
+    border: 1px solid rgba(88,166,255,0.4);
+  }
+  .btn-outline:hover { background: rgba(88,166,255,0.08); }
+
+  .format-hint {
+    margin-top: 16px; font-size: 11px; color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ─── App section (after load) ─────────────────────────── */
+  #app-section { display: none; }
+
+  /* ─── Stats Bar ─────────────────────────────────────────── */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px;
+  }
+  .stat-card .label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.8px; font-weight: 500; margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px; font-weight: 700; color: var(--text);
+  }
+  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ─── Tabs ──────────────────────────────────────────────── */
+  .tabs-wrapper {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 22px; overflow: hidden;
+  }
+  .tabs-header {
+    display: flex; overflow-x: auto; border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  .tabs-header::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 12px 20px;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex; align-items: center; gap: 7px;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ─── Panel ─────────────────────────────────────────────── */
+  .panel { padding: 24px; display: none; }
+  .panel.active { display: block; }
+
+  /* ─── Charts Grid ───────────────────────────────────────── */
+  .charts-grid-top { margin-bottom: 16px; }
+  .charts-grid-bottom { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+
+  .chart-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .chart-title {
+    padding: 12px 16px 0;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ─── Stats Table ───────────────────────────────────────── */
+  .param-stats {
+    display: grid; grid-template-columns: repeat(6,1fr); gap: 10px;
+    margin-bottom: 18px;
+  }
+  .pstat {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .pstat .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .pstat .val { font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; margin-top: 4px; }
+
+  /* ─── Ref bar ───────────────────────────────────────────── */
+  .ref-bar {
+    background: rgba(212,172,13,0.08); border: 1px solid rgba(212,172,13,0.3);
+    border-radius: 8px; padding: 8px 16px; margin-bottom: 16px;
+    font-size: 12px; color: #E5C100;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ─── Footer ────────────────────────────────────────────── */
+  .footer-actions {
+    margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .info-text { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
+
+  /* ─── Loading spinner ───────────────────────────────────── */
+  #loading {
+    display: none; position: fixed; inset: 0;
+    background: rgba(13,17,23,0.85); z-index: 999;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px;
+  }
+  #loading.show { display: flex; }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  /* ─── Error toast ───────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 200;
+    background: #3D1A1A; border: 1px solid #8B2020;
+    border-radius: 10px; padding: 14px 18px; max-width: 380px;
+    font-size: 13px; color: #FFB3B3; display: none;
+  }
+  #toast.show { display: block; }
+
+  /* ─── Responsive ────────────────────────────────────────── */
+  @media(max-width: 900px) {
+    main { padding: 16px; }
+    .stats-bar { grid-template-columns: repeat(2,1fr); }
+    .charts-grid-bottom { grid-template-columns: 1fr; }
+    .param-stats { grid-template-columns: repeat(3,1fr); }
+    .upload-card { padding: 36px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loading-msg">Processando dados…</p>
+</div>
+
+<!-- Error toast -->
+<div id="toast"></div>
+
+<!-- Header -->
+<header>
+  <div class="logo">🌫</div>
+  <div>
+    <h1>AirQuality Dashboard</h1>
+    <p>Análise estatística de qualidade do ar</p>
+  </div>
+  <div class="header-right">
+    <span class="badge">v2.0</span>
+    <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
+      📂 Novo arquivo
+      <input type="file" id="file-reopen" accept=".xlsx,.xls" style="display:none"/>
+    </label>
+  </div>
+</header>
+
+<!-- Upload section -->
+<div id="upload-section">
+  <div class="upload-card" id="drop-zone">
+    <div class="upload-icon">📊</div>
+    <h2>Carregar dados de qualidade do ar</h2>
+    <p>Faça upload do arquivo Excel com os dados brutos.<br/>
+       Deve conter a aba <code>Dados brutos</code> com <code>data_local</code>, <code>timestamp_local</code> ou <code>Timestamp (Local)</code>.</p>
+    <label class="btn" for="file-input">
+      ⬆ Selecionar arquivo Excel
+      <input type="file" id="file-input" accept=".xlsx,.xls"/>
+    </label>
+    <p class="format-hint">Formatos suportados: .xlsx · .xls</p>
+  </div>
+</div>
+
+<!-- App section (hidden until file loaded) -->
+<div id="app-section">
+  <main>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="label">Período</div>
+        <div class="value" id="stat-period">—</div>
+        <div class="sub" id="stat-days"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Total de registros</div>
+        <div class="value" id="stat-rows">—</div>
+        <div class="sub">leituras brutas</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Parâmetros</div>
+        <div class="value" id="stat-params">—</div>
+        <div class="sub">disponíveis</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Cobertura</div>
+        <div class="value" id="stat-coverage">—</div>
+        <div class="sub">dados válidos (média)</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-wrapper">
+      <div class="tabs-header" id="tabs-header"></div>
+      <div id="panels-container"></div>
+    </div>
+
+    <div class="footer-actions">
+      <span class="info-text" id="file-info"></span>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIGURAÇÃO DOS PARÂMETROS
+// ═══════════════════════════════════════════════════════════
+const PARAMS = {
+  CO2:      { nome:'CO₂',        unidade:'ppm',    vmin:0,    vmax:10000, cor:'#4A90C4', corClara:'rgba(74,144,196,0.18)', alerta:null, critico:null, refs:[] },
+  NOx:      { nome:'NOₓ',        unidade:'ppb',    vmin:0,    vmax:5000,  cor:'#E67E22', corClara:'rgba(230,126,34,0.18)', alerta:200,  critico:400,  refs:[] },
+  PM1:      { nome:'PM₁',        unidade:'µg/m³',  vmin:0,    vmax:2000,  cor:'#27AE60', corClara:'rgba(39,174,96,0.18)',  alerta:null, critico:null, refs:[] },
+  PM10:     { nome:'PM₁₀',       unidade:'µg/m³',  vmin:0,    vmax:2000,  cor:'#C0392B', corClara:'rgba(192,57,43,0.18)',  alerta:null, critico:null,
+    refs:[{valor:45,label:'OMS 2021 (45 µg/m³)',cor:'#A855F7',dash:'dash'},{valor:50,label:'ABNT NBR 17037 (50 µg/m³)',cor:'#F59E0B',dash:'dashdot'}] },
+  'PM2.5':  { nome:'PM₂,₅',      unidade:'µg/m³',  vmin:0,    vmax:2000,  cor:'#8E44AD', corClara:'rgba(142,68,173,0.18)', alerta:null, critico:null,
+    refs:[{valor:15,label:'OMS 2021 (15 µg/m³)',cor:'#A855F7',dash:'dash'},{valor:25,label:'ABNT NBR 17037 (25 µg/m³)',cor:'#F59E0B',dash:'dashdot'}] },
+  Pressao:  { nome:'Pressão',     unidade:'hPa',    vmin:null, vmax:null,  cor:'#7F8C8D', corClara:'rgba(127,140,141,0.18)', alerta:null, critico:null, refs:[] },
+  Temp:     { nome:'Temperatura', unidade:'°C',     vmin:null, vmax:null,  cor:'#E74C3C', corClara:'rgba(231,76,60,0.18)',   alerta:null, critico:null, refs:[] },
+  Umid:     { nome:'Umidade',     unidade:'%',      vmin:0,    vmax:100,   cor:'#16A085', corClara:'rgba(22,160,133,0.18)',  alerta:null, critico:null, refs:[] },
+  VOC:      { nome:'VOC',         unidade:'ppb',    vmin:0,    vmax:null,  cor:'#D35400', corClara:'rgba(211,84,0,0.18)',    alerta:500,  critico:1000, refs:[] },
+};
+
+const PLOT_LAYOUT_BASE = {
+  paper_bgcolor:'transparent', plot_bgcolor:'#1C2333',
+  font:{ family:"'DM Sans', sans-serif", color:'#E6EDF3', size:11 },
+  margin:{ t:10, b:46, l:52, r:18 },
+  xaxis:{ gridcolor:'#30363D', linecolor:'#30363D', zerolinecolor:'#30363D' },
+  yaxis:{ gridcolor:'#30363D', linecolor:'#30363D', zerolinecolor:'#30363D' },
+  legend:{ bgcolor:'rgba(22,27,34,0.85)', bordercolor:'#30363D', borderwidth:1, font:{size:10} },
+  hoverlabel:{ bgcolor:'#1C2333', bordercolor:'#30363D', font:{color:'#E6EDF3', size:12} },
+};
+const PLOT_CONFIG = { responsive:true, displayModeBar:false };
+
+// ═══════════════════════════════════════════════════════════
+// UTILITÁRIOS ESTATÍSTICOS
+// ═══════════════════════════════════════════════════════════
+function percentile(arr, p) {
+  const s = [...arr].sort((a,b)=>a-b), n=s.length;
+  const idx = (p/100)*(n-1);
+  const lo=Math.floor(idx), hi=Math.ceil(idx);
+  return s[lo]+(idx-lo)*(s[hi]-s[lo]);
+}
+function mean(arr) { return arr.reduce((s,v)=>s+v,0)/arr.length; }
+function median(arr) { return percentile(arr,50); }
+function std(arr) { const m=mean(arr); return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length); }
+
+// Normal quantile (probit) — Beasley-Springer-Moro approximation
+function normPPF(p) {
+  if(p<=0) return -Infinity; if(p>=1) return Infinity;
+  const a=[2.50662823884,-18.61500062529,41.39119773534,-25.44106049637];
+  const b=[-8.47351093090,23.08336743743,-21.06224101826,3.13082909833];
+  const c=[0.3374754822726147,0.9761690190917186,0.1607979714918209,0.0276438810333863,
+           0.0038405729373609,0.0003951896511349,0.0000321767881768,0.0000002888167364,0.0000003960315187];
+  const q=p-0.5;
+  if(Math.abs(q)<0.42) {
+    const r=q*q;
+    return q*(((a[3]*r+a[2])*r+a[1])*r+a[0])/((((b[3]*r+b[2])*r+b[1])*r+b[0])*r+1);
+  }
+  let r=(q<0)?p:(1-p);
+  r=Math.log(-Math.log(r));
+  let y=c[0];
+  for(let i=1;i<9;i++) y=y*r+c[i];
+  return (q<0)?-y:y;
+}
+
+function computeQQ(vals) {
+  const n = vals.length;
+  const sorted = [...vals].sort((a,b)=>a-b);
+  const theoretical = sorted.map((_,i) => normPPF((i+1-0.375)/(n+0.25)));
+  // Linear regression
+  const tx = theoretical, ty = sorted;
+  const mx=mean(tx), my=mean(ty);
+  const num=tx.reduce((s,x,i)=>s+(x-mx)*(ty[i]-my),0);
+  const den=tx.reduce((s,x)=>s+(x-mx)**2,0);
+  const slope=num/den, intercept=my-slope*mx;
+  const fitted=tx.map(x=>slope*x+intercept);
+  const ssres=ty.reduce((s,y,i)=>s+(y-fitted[i])**2,0);
+  const sstot=ty.reduce((s,y)=>s+(y-my)**2,0);
+  const r2=1-ssres/sstot;
+  return { theoretical, observed:sorted, slope, intercept, r2 };
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROCESSAMENTO DE DADOS
+// ═══════════════════════════════════════════════════════════
+function findExistingKey(obj, candidates) {
+  return candidates.find(k => Object.prototype.hasOwnProperty.call(obj, k));
+}
+
+function parseNumberLocal(value) {
+  if (value == null || value === '') return NaN;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+
+  let s = String(value).trim();
+  if (!s) return NaN;
+
+  s = s.replace(/\s+/g, '');
+
+  // Se vier no formato 1.234,56 → 1234.56
+  if (s.includes(',') && s.includes('.')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.includes(',')) {
+    s = s.replace(',', '.');
+  }
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function normalizeParamName(param) {
+  if (param == null) return null;
+  const raw = String(param).trim();
+
+  const normalized = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[₁]/g, '1')
+    .replace(/[₂]/g, '2')
+    .replace(/[₅]/g, '5')
+    .replace(/[ₓ]/gi, 'x')
+    .replace(/[.,]/g, '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+
+  const map = {
+    'CO2': 'CO2',
+    'NOX': 'NOx',
+    'PM1': 'PM1',
+    'PM25': 'PM2.5',
+    'PM10': 'PM10',
+    'PRESSAO': 'Pressao',
+    'TEMP': 'Temp',
+    'TEMPERATURA': 'Temp',
+    'UMID': 'Umid',
+    'UMIDADE': 'Umid',
+    'VOC': 'VOC',
+  };
+
+  return map[normalized] || null;
+}
+
+function parseData(wb) {
+  const ws = wb.Sheets['Dados brutos'];
+  if(!ws) throw new Error("Aba 'Dados brutos' não encontrada no arquivo.");
+
+  const raw = XLSX.utils.sheet_to_json(ws, {raw:false, defval:null});
+  if (!raw.length) throw new Error("A aba 'Dados brutos' está vazia.");
+
+  const firstRow = raw[0];
+
+  const dateKey = findExistingKey(firstRow, ['data_local', 'timestamp_local', 'Timestamp (Local)']);
+  const paramKey = findExistingKey(firstRow, ['Parâmetro solicitado', 'Parametro solicitado', 'parâmetro', 'parametro', 'Parâmetro', 'Parametro']);
+  const valueKey = findExistingKey(firstRow, ['Valor', 'valor']);
+
+  const hasWideFormat = !!dateKey;
+  const hasLongFormat = !!(dateKey && paramKey && valueKey);
+
+  // Formato longo: uma linha por timestamp + parâmetro
+  if (hasLongFormat) {
+    const byTs = {};
+
+    raw.forEach(r => {
+      const ts = r[dateKey];
+      const param = normalizeParamName(r[paramKey]);
+      const value = parseNumberLocal(r[valueKey]);
+
+      if (!ts || !param || Number.isNaN(value)) return;
+
+      if (!byTs[ts]) byTs[ts] = { data_local: ts };
+      byTs[ts][param] = value;
+    });
+
+    const rows = Object.values(byTs).map(r => {
+      const dt = new Date(r.data_local);
+      return { ...r, _dt: dt && !isNaN(dt) ? dt : null };
+    }).filter(r => r._dt).sort((a,b)=>a._dt-b._dt);
+
+    if (!rows.length) {
+      throw new Error("Nenhuma linha válida foi encontrada após consolidar os dados.");
+    }
+
+    return rows;
+  }
+
+  // Formato largo: uma linha por timestamp, colunas separadas por parâmetro
+  if (hasWideFormat) {
+    const rows = raw.map(r => {
+      const dv = r[dateKey];
+      const dt = dv ? new Date(dv) : null;
+      return { ...r, data_local: dv, _dt: dt && !isNaN(dt) ? dt : null };
+    }).filter(r=>r._dt).sort((a,b)=>a._dt-b._dt);
+
+    if (!rows.length) {
+      throw new Error("Nenhuma linha válida foi encontrada na coluna de data.");
+    }
+
+    return rows;
+  }
+
+  throw new Error("Formato inválido. Esperado: 'data_local', 'timestamp_local' ou 'Timestamp (Local)'.");
+}
+
+function filterParam(rows, col, cfg) {
+  return rows.map(r=>({dt:r._dt, v:parseNumberLocal(r[col])}))
+    .filter(r=>!isNaN(r.v))
+    .filter(r=>cfg.vmin===null||r.v>=cfg.vmin)
+    .filter(r=>cfg.vmax===null||r.v<=cfg.vmax);
+}
+
+function dailyStats(rows) {
+  const map={};
+  rows.forEach(({dt,v})=>{
+    const k=dt.toISOString().slice(0,10);
+    if(!map[k]) map[k]={sum:0,count:0,min:Infinity,max:-Infinity,vals:[]};
+    map[k].sum+=v; map[k].count++; map[k].vals.push(v);
+    if(v<map[k].min) map[k].min=v; if(v>map[k].max) map[k].max=v;
+  });
+  const keys=Object.keys(map).sort();
+  return {
+    dates: keys.map(k=>new Date(k)),
+    means: keys.map(k=>map[k].sum/map[k].count),
+    mins:  keys.map(k=>map[k].min),
+    maxs:  keys.map(k=>map[k].max),
+  };
+}
+
+function hourlyStats(rows) {
+  const map={};
+  for(let h=0;h<24;h++) map[h]={vals:[]};
+  rows.forEach(({dt,v})=>{ map[dt.getHours()].vals.push(v); });
+  const hours=Array.from({length:24},(_,i)=>i);
+  return {
+    hours,
+    means:   hours.map(h=>mean(map[h].vals)||null),
+    medians: hours.map(h=>median(map[h].vals)||null),
+    mins:    hours.map(h=>Math.min(...map[h].vals)),
+    maxs:    hours.map(h=>Math.max(...map[h].vals)),
+  };
+}
+
+const DIAS=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+const JS_DOW=[1,2,3,4,5,6,0]; // Mon=1...Sun=0 in JS getDay()
+function weekdayBoxplot(rows) {
+  const map={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+  rows.forEach(({dt,v})=>{ const d=dt.getDay(); const idx=JS_DOW.indexOf(d); if(idx>=0) map[idx].push(v); });
+  return DIAS.map((_,i)=>map[i]);
+}
+
+function computeStats(vals) {
+  const n=vals.length;
+  if(!n) return null;
+  const s=[...vals].sort((a,b)=>a-b);
+  return { n, mean:mean(vals), median:median(vals), std:std(vals), min:s[0], max:s[s.length-1], p95:percentile(vals,95) };
+}
+
+// ═══════════════════════════════════════════════════════════
+// CORES & SHAPES PARA LINHAS DE REFERÊNCIA
+// ═══════════════════════════════════════════════════════════
+function refShapes(cfg, yref='y') {
+  const shapes=[], annotations=[];
+  if(cfg.alerta!=null) {
+    shapes.push({type:'line',x0:0,x1:1,xref:'paper',y0:cfg.alerta,y1:cfg.alerta,yref,
+      line:{color:'#E6A817',width:1.5,dash:'dash'}});
+    annotations.push({x:1,xref:'paper',y:cfg.alerta,yref,text:'Alerta',xanchor:'right',
+      showarrow:false,font:{color:'#E6A817',size:9},bgcolor:'rgba(22,27,34,0.7)',borderpad:2});
+  }
+  if(cfg.critico!=null) {
+    shapes.push({type:'line',x0:0,x1:1,xref:'paper',y0:cfg.critico,y1:cfg.critico,yref,
+      line:{color:'#C0392B',width:1.5,dash:'dash'}});
+    annotations.push({x:1,xref:'paper',y:cfg.critico,yref,text:'Crítico',xanchor:'right',
+      showarrow:false,font:{color:'#C0392B',size:9},bgcolor:'rgba(22,27,34,0.7)',borderpad:2});
+  }
+  cfg.refs.forEach(ref=>{
+    shapes.push({type:'line',x0:0,x1:1,xref:'paper',y0:ref.valor,y1:ref.valor,yref,
+      line:{color:ref.cor,width:2,dash:ref.dash}});
+    annotations.push({x:0,xref:'paper',y:ref.valor,yref,text:ref.label,xanchor:'left',
+      showarrow:false,font:{color:ref.cor,size:9},bgcolor:'rgba(22,27,34,0.8)',borderpad:2,yanchor:'bottom'});
+  });
+  return {shapes,annotations};
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILD CHARTS
+// ═══════════════════════════════════════════════════════════
+function buildTimeSeries(divId, rows, cfg) {
+  const d = dailyStats(rows);
+  const {shapes,annotations} = refShapes(cfg);
+  const traces=[
+    { name:'Mín/Máx', x:[...d.dates,...[...d.dates].reverse()],
+      y:[...d.maxs,...[...d.mins].reverse()], fill:'toself', fillcolor:cfg.corClara,
+      line:{color:'transparent'}, mode:'lines', type:'scatter', showlegend:true, hoverinfo:'skip' },
+    { name:'Média diária', x:d.dates, y:d.means, mode:'lines',
+      line:{color:cfg.cor,width:2.2}, type:'scatter' },
+  ];
+  const layout={
+    ...PLOT_LAYOUT_BASE, height:270, margin:{...PLOT_LAYOUT_BASE.margin, b:56},
+    shapes, annotations,
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, type:'date'},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:10}}},
+    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+  };
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
+function buildDiurnal(divId, rows, cfg) {
+  const h = hourlyStats(rows);
+  const {shapes,annotations} = refShapes(cfg);
+  const traces=[
+    { name:'Mín/Máx', x:[...h.hours,...[...h.hours].reverse()],
+      y:[...h.maxs,...[...h.mins].reverse()], fill:'toself', fillcolor:cfg.corClara,
+      line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
+    { name:'Média', x:h.hours, y:h.means, mode:'lines', line:{color:cfg.cor,width:2.2}, type:'scatter' },
+    { name:'Mediana', x:h.hours, y:h.medians, mode:'lines', line:{color:cfg.cor,width:1.4,dash:'dot'}, type:'scatter' },
+  ];
+  const layout={
+    ...PLOT_LAYOUT_BASE, height:270,
+    shapes, annotations,
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, tickvals:Array.from({length:12},(_,i)=>i*2),
+      ticktext:Array.from({length:12},(_,i)=>`${String(i*2).padStart(2,'0')}h`),
+      title:{text:'Hora',font:{size:10}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:10}}},
+    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+  };
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
+function buildQQ(divId, vals, cfg) {
+  const qq = computeQQ(vals);
+  const lx=[qq.theoretical[0], qq.theoretical[qq.theoretical.length-1]];
+  const ly=lx.map(x=>qq.slope*x+qq.intercept);
+  const traces=[
+    { x:qq.theoretical, y:qq.observed, mode:'markers', type:'scatter', name:'Dados',
+      marker:{color:cfg.cor, size:4, opacity:0.7, line:{width:0}} },
+    { x:lx, y:ly, mode:'lines', type:'scatter', name:'Linha normal',
+      line:{color:'#E6EDF3', width:1.5} },
+  ];
+  const layout={
+    ...PLOT_LAYOUT_BASE, height:270,
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, title:{text:'Quantis teóricos',font:{size:10}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:'Quantis observados',font:{size:10}}},
+    annotations:[{x:0.97, y:0.05, xref:'paper', yref:'paper',
+      text:`R² = ${qq.r2.toFixed(3)}`, showarrow:false,
+      font:{color:'#E6EDF3',size:11,family:"'Space Mono',monospace"},
+      bgcolor:'rgba(22,27,34,0.9)', bordercolor:'#30363D', borderwidth:1, borderpad:4,
+      xanchor:'right', yanchor:'bottom'}],
+    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+  };
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
+function buildBoxplot(divId, rows, cfg) {
+  const groups = weekdayBoxplot(rows);
+  const {shapes,annotations} = refShapes(cfg);
+  const traces = DIAS.map((dia,i)=>({
+    y:groups[i], type:'box', name:dia,
+    marker:{color:cfg.cor, size:3, opacity:0.5},
+    line:{color:cfg.cor},
+    fillcolor:cfg.corClara,
+    whiskerwidth:0.8,
+    boxmean:true,
+  }));
+  const layout={
+    ...PLOT_LAYOUT_BASE, height:270,
+    shapes, annotations,
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, tickfont:{size:10}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:10}}},
+    showlegend:false,
+  };
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUILD PANEL HTML & CHARTS
+// ═══════════════════════════════════════════════════════════
+function fmt(v, dec=1) { return (v==null||isNaN(v))?'—':v.toFixed(dec); }
+function fmtDate(d) {
+  const s=d.toISOString().slice(0,10).split('-');
+  return `${s[2]}/${s[1]}/${s[0]}`;
+}
+
+function buildPanel(col, cfg, rows) {
+  const vals = rows.map(r=>r.v);
+  const st   = computeStats(vals);
+
+  const panelId = `panel-${col.replace(/\./g,'_')}`;
+  const ts  = `ts-${col.replace(/\./g,'_')}`;
+  const dp  = `dp-${col.replace(/\./g,'_')}`;
+  const qq  = `qq-${col.replace(/\./g,'_')}`;
+  const bp  = `bp-${col.replace(/\./g,'_')}`;
+
+  const refText = cfg.refs.length
+    ? `<div class="ref-bar">⚠ Referências destacadas: ${cfg.refs.map(r=>r.label).join('  ·  ')}</div>`
+    : '';
+
+  const container = document.getElementById('panels-container');
+  const div = document.createElement('div');
+  div.id   = panelId;
+  div.className = 'panel';
+  div.innerHTML = `
+    <div class="param-stats">
+      <div class="pstat"><div class="lbl">N</div><div class="val" style="color:${cfg.cor}">${st.n.toLocaleString('pt-BR')}</div></div>
+      <div class="pstat"><div class="lbl">Média</div><div class="val">${fmt(st.mean)}</div></div>
+      <div class="pstat"><div class="lbl">Mediana</div><div class="val">${fmt(st.median)}</div></div>
+      <div class="pstat"><div class="lbl">Desvio padrão</div><div class="val">${fmt(st.std)}</div></div>
+      <div class="pstat"><div class="lbl">Mín → Máx</div><div class="val" style="font-size:12px">${fmt(st.min)} → ${fmt(st.max)}</div></div>
+      <div class="pstat"><div class="lbl">P95</div><div class="val">${fmt(st.p95)}</div></div>
+    </div>
+    ${refText}
+    <div class="chart-card charts-grid-top">
+      <div class="chart-title">SÉRIE TEMPORAL — ${cfg.nome} (${cfg.unidade})</div>
+      <div id="${ts}"></div>
+    </div>
+    <div class="charts-grid-bottom">
+      <div class="chart-card">
+        <div class="chart-title">PERFIL DIURNO</div>
+        <div id="${dp}"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Q-Q PLOT — NORMALIDADE</div>
+        <div id="${qq}"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">BOXPLOT POR DIA DA SEMANA</div>
+        <div id="${bp}"></div>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+
+  // Build charts (async after DOM paint)
+  requestAnimationFrame(()=>{
+    buildTimeSeries(ts, rows, cfg);
+    buildDiurnal(dp, rows, cfg);
+    buildQQ(qq, vals, cfg);
+    buildBoxplot(bp, rows, cfg);
+  });
+
+  return panelId;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB SYSTEM
+// ═══════════════════════════════════════════════════════════
+let activeTab = null;
+function switchTab(col) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.col===col));
+  document.querySelectorAll('.panel').forEach(p=>{
+    p.classList.toggle('active', p.id===`panel-${col.replace(/\./g,'_')}`);
+  });
+  activeTab = col;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN LOAD FUNCTION
+// ═══════════════════════════════════════════════════════════
+function loadFile(file) {
+  if(!file) return;
+  showLoading('Lendo arquivo Excel…');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const rows = parseData(wb);
+      if (!rows.length) {
+        throw new Error("Nenhuma linha válida foi encontrada após ler a aba 'Dados brutos'.");
+      }
+
+      loadingMsg('Calculando estatísticas…');
+      const totalRows = rows.length;
+      const allDates = rows.map(r=>r._dt).filter(Boolean);
+      if (!allDates.length) throw new Error('Nenhuma data válida encontrada no arquivo.');
+      const dMin = new Date(Math.min(...allDates));
+      const dMax = new Date(Math.max(...allDates));
+      const nDays = Math.round((dMax-dMin)/864e5)+1;
+
+      // Detect available params
+      const cols = Object.keys(rows[0]).filter(k=>k!=='_dt');
+      const availParams = Object.entries(PARAMS).filter(([k])=>cols.includes(k));
+
+      if(!availParams.length) throw new Error("Nenhuma coluna de parâmetro reconhecida. Esperado: CO2, NOx, PM1, PM10, PM2.5, Pressao, Temp, Umid, VOC");
+
+      // Stats bar
+      document.getElementById('stat-period').textContent =
+        `${fmtDate(dMin)} – ${fmtDate(dMax)}`;
+      document.getElementById('stat-days').textContent = `${nDays} dias`;
+      document.getElementById('stat-rows').textContent = totalRows.toLocaleString('pt-BR');
+      document.getElementById('stat-params').textContent = availParams.length;
+
+      // Compute avg coverage
+      const coverages = availParams.map(([k,cfg])=>{
+        const r = filterParam(rows, k, cfg);
+        return r.length / totalRows;
+      });
+      const avgCov = mean(coverages);
+      document.getElementById('stat-coverage').textContent = `${(avgCov*100).toFixed(1)}%`;
+      document.getElementById('file-info').textContent = `Arquivo: ${file.name} · ${(file.size/1024).toFixed(0)} KB`;
+
+      // Clear previous content
+      document.getElementById('tabs-header').innerHTML='';
+      document.getElementById('panels-container').innerHTML='';
+
+      // Build tabs + panels
+      const tabsHeader = document.getElementById('tabs-header');
+      availParams.forEach(([col, cfg], idx) => {
+        loadingMsg(`Gerando painel: ${cfg.nome}…`);
+        const fRows = filterParam(rows, col, cfg);
+        if(fRows.length < 5) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (idx===0?' active':'');
+        btn.dataset.col = col;
+        btn.innerHTML = `<span class="tab-dot" style="background:${cfg.cor}"></span>${cfg.nome}`;
+        btn.onclick = ()=>switchTab(col);
+        tabsHeader.appendChild(btn);
+
+        const panelId = buildPanel(col, cfg, fRows);
+        if(idx===0) {
+          activeTab=col;
+          setTimeout(()=>{ document.getElementById(panelId)?.classList.add('active'); },50);
+        }
+      });
+
+      // Show app
+      document.getElementById('upload-section').style.display='none';
+      document.getElementById('app-section').style.display='block';
+      hideLoading();
+
+    } catch(err) {
+      hideLoading();
+      showToast(`Erro ao processar arquivo: ${err.message}`);
+      console.error(err);
+    }
+  };
+  reader.onerror = ()=>{ hideLoading(); showToast('Erro ao ler o arquivo.'); };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════
+function showLoading(msg='Carregando…') {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading').classList.add('show');
+}
+function loadingMsg(msg) { document.getElementById('loading-msg').textContent = msg; }
+function hideLoading() { document.getElementById('loading').classList.remove('show'); }
+function showToast(msg, dur=5000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EVENT LISTENERS
+// ═══════════════════════════════════════════════════════════
+['file-input','file-reopen'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('change', e=>{
+    loadFile(e.target.files[0]);
+    e.target.value=''; // allow re-select same file
+  });
+});
+
+// Drag-and-drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault(); dropZone.classList.remove('drag');
+  loadFile(e.dataTransfer.files[0]);
+});
+dropZone.addEventListener('click', ()=>document.getElementById('file-input').click());
+</script>
+</body>
+</html>
