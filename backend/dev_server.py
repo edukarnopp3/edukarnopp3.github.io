@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-if not os.getenv("ISEQ_EXPORT_DIR"):
+if not os.getenv("ISEQ_BEARER_TOKEN") and not os.getenv("ISEQ_EXPORT_DIR"):
     downloads = Path.home() / "Downloads"
     if downloads.exists():
         os.environ["ISEQ_EXPORT_DIR"] = str(downloads)
@@ -31,7 +31,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/health":
-            self.respond(200, {"status": "ok", "collector_dir": os.getenv("ISEQ_EXPORT_DIR", "")})
+            mode = "api" if os.getenv("ISEQ_BEARER_TOKEN") else "local_files" if os.getenv("ISEQ_EXPORT_DIR") else "not_configured"
+            self.respond(200, {"status": "ok", "collector_mode": mode, "collector_dir": os.getenv("ISEQ_EXPORT_DIR", "")})
             return
 
         if path.startswith("/api/iseq/jobs/"):

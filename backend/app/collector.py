@@ -38,15 +38,19 @@ class ApiReportCollector(IseqCollector):
         self.api_base = (api_base or "https://sensores.iseq.com.br/api-v2-staging").rstrip("/") + "/"
         self.timeout_seconds = int(os.getenv("ISEQ_REPORT_TIMEOUT_SECONDS", "900"))
         self.poll_seconds = int(os.getenv("ISEQ_REPORT_POLL_SECONDS", "5"))
+        self.request_timeout_seconds = int(os.getenv("ISEQ_REQUEST_TIMEOUT_SECONDS", "180"))
+        self.download_timeout_seconds = int(os.getenv("ISEQ_DOWNLOAD_TIMEOUT_SECONDS", "300"))
         self.utc_offset_hours = int(os.getenv("ISEQ_LOCAL_UTC_OFFSET_HOURS", "3"))
 
     def fetch_export(self, task: ExportTask, destination_dir: Path) -> Path:
-        report = self._find_ready_report(task) or self._generate_and_wait(task)
+        report = self._safe_find_ready_report(task) or self._generate_and_wait(task)
         report_id = report.get("id")
         if not report_id:
             raise RuntimeError(f"Relatorio pronto sem id para {task.parameter}.")
 
-        data = self._request_bytes(f"reports/{report_id}/download")
+        data = report.get("_downloaded_bytes")
+        if not isinstance(data, bytes):
+            data = self._request_bytes(f"reports/{report_id}/download")
         destination_dir.mkdir(parents=True, exist_ok=True)
         filename = self._safe_filename(report.get("nome") or f"{task.parameter}_{task.start:%Y%m%d}_{task.end:%Y%m%d}.xlsx")
         if not filename.lower().endswith(".xlsx"):
@@ -54,6 +58,12 @@ class ApiReportCollector(IseqCollector):
         destination = destination_dir / filename
         destination.write_bytes(data)
         return destination
+
+    def _safe_find_ready_report(self, task: ExportTask) -> dict[str, object] | None:
+        try:
+            return self._find_ready_report(task)
+        except Exception:
+            return None
 
     def _generate_and_wait(self, task: ExportTask) -> dict[str, object]:
         payload = {
@@ -66,18 +76,42 @@ class ApiReportCollector(IseqCollector):
         response = self._request_json("generate-report", method="POST", payload=payload)
         direct_id = self._extract_report_id(response)
         deadline = time.time() + self.timeout_seconds
+        last_error: Exception | None = None
 
         while time.time() < deadline:
             if direct_id:
-                report = self._find_report_by_id(direct_id)
-                if report and self._is_ready(report):
+                direct_download = self._try_direct_download(direct_id, task)
+                if direct_download:
+                    return direct_download
+                try:
+                    report = self._find_report_by_id(direct_id)
+                    if report and self._is_ready(report):
+                        return report
+                except Exception as exc:
+                    last_error = exc
+            try:
+                report = self._find_ready_report(task)
+                if report:
                     return report
-            report = self._find_ready_report(task)
-            if report:
-                return report
+            except Exception as exc:
+                last_error = exc
             time.sleep(self.poll_seconds)
 
-        raise TimeoutError(f"Relatorio {task.parameter} nao ficou pronto em {self.timeout_seconds}s.")
+        detail = f" Ultimo erro: {last_error}" if last_error else ""
+        raise TimeoutError(f"Relatorio {task.parameter} nao ficou pronto em {self.timeout_seconds}s.{detail}")
+
+    def _try_direct_download(self, report_id: object, task: ExportTask) -> dict[str, object] | None:
+        try:
+            data = self._request_bytes(f"reports/{report_id}/download", timeout=min(45, self.download_timeout_seconds))
+        except Exception:
+            return None
+        if not data.startswith(b"PK"):
+            return None
+        return {
+            "id": report_id,
+            "nome": f"{task.parameter}_{task.start:%Y%m%d}_{task.end:%Y%m%d}.xlsx",
+            "_downloaded_bytes": data,
+        }
 
     def _find_ready_report(self, task: ExportTask) -> dict[str, object] | None:
         reports = self._list_reports()
@@ -162,25 +196,30 @@ class ApiReportCollector(IseqCollector):
             headers=self._headers(json_payload=payload is not None),
         )
         try:
-            with urlopen(request, timeout=60) as response:
+            with urlopen(request, timeout=self.request_timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"ISEQ API HTTP {exc.code}: {detail}") from exc
         except URLError as exc:
             raise RuntimeError(f"Falha de conexao com ISEQ API: {exc.reason}") from exc
+        except TimeoutError as exc:
+            raise RuntimeError(f"Tempo esgotado na API ISEQ apos {self.request_timeout_seconds}s.") from exc
         return json.loads(raw) if raw else {}
 
-    def _request_bytes(self, endpoint: str) -> bytes:
+    def _request_bytes(self, endpoint: str, timeout: int | None = None) -> bytes:
         request = Request(urljoin(self.api_base, endpoint), method="GET", headers=self._headers())
+        timeout_seconds = timeout or self.download_timeout_seconds
         try:
-            with urlopen(request, timeout=120) as response:
+            with urlopen(request, timeout=timeout_seconds) as response:
                 return response.read()
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"ISEQ download HTTP {exc.code}: {detail}") from exc
         except URLError as exc:
             raise RuntimeError(f"Falha de conexao no download ISEQ: {exc.reason}") from exc
+        except TimeoutError as exc:
+            raise RuntimeError(f"Tempo esgotado no download ISEQ apos {timeout_seconds}s.") from exc
 
     def _headers(self, json_payload: bool = False) -> dict[str, str]:
         headers = {

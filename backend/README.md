@@ -20,14 +20,14 @@ python -m playwright install chromium
 
 Esse modo abre uma janela de login do ISEQ, espera voce entrar, captura o token localmente e sobe o backend em `http://127.0.0.1:8000`. O token nao e impresso nem salvo no repositorio.
 
-Para acelerar a exportacao, o backend baixa ate 3 relatorios ao mesmo tempo. Se o site estiver estavel, voce pode ajustar antes de iniciar:
+Para acelerar a exportacao, o backend baixa ate 2 relatorios ao mesmo tempo. Se o site estiver estavel, voce pode ajustar antes de iniciar:
 
 ```powershell
 $env:ISEQ_JOB_WORKERS="4"
 python login_and_run.py
 ```
 
-Use valores entre 1 e 6. Quanto maior, mais rapido tende a ficar, mas tambem aumenta a chance de o site limitar ou demorar respostas.
+Use valores entre 1 e 6. Quanto maior, mais rapido tende a ficar, mas tambem aumenta a chance de o site limitar ou demorar respostas. Se a API do ISEQ comecar a dar timeout, use `1`.
 
 Modo simples, sem instalar FastAPI, usando a API do ISEQ:
 

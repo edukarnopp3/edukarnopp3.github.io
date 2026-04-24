@@ -1718,6 +1718,11 @@ async function pollIseqJob(backendUrl, jobId) {
     setIseqProgress(job);
 
     if(job.status === 'completed') break;
+    if(['failed', 'cancelled', 'stale'].includes(job.status)) {
+      const message = job.message || 'Job interrompido. Inicie uma nova busca.';
+      setIseqStatus(message, 'error');
+      throw new Error(message);
+    }
     await sleep(3000);
   }
 

@@ -55,9 +55,9 @@ class JobStore:
         self.lock = threading.RLock()
         self.collector = build_collector()
         try:
-            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "3"))
+            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "2"))
         except ValueError:
-            configured_workers = 3
+            configured_workers = 2
         self.max_workers = max(1, min(configured_workers, 6))
 
     def create_job(self, equipment_id: str, start: datetime, end: datetime) -> JobState:
@@ -239,6 +239,12 @@ class JobStore:
         raw = json.loads(path.read_text(encoding="utf-8"))
         raw["tasks"] = [TaskState(**task) for task in raw.get("tasks", [])]
         job = JobState(**raw)
+        if job.status in {"queued", "running", "retrying", "waiting_configuration"}:
+            job.status = "failed"
+            job.message = "Backend foi reiniciado antes de concluir. Inicie uma nova busca."
+            job.updated_at = datetime.now().isoformat(timespec="seconds")
         with self.lock:
             self.jobs[job_id] = job
+            if job.status == "failed":
+                self._save_job(job)
         return job
