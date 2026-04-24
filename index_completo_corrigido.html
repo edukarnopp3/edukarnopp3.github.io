@@ -7,6 +7,7 @@
 
 <!-- SheetJS & Plotly -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
 <!-- Google Fonts -->
@@ -313,6 +314,56 @@
     display: flex; align-items: center; gap: 8px;
   }
 
+  /* ─── Export tools ─────────────────────────────────────── */
+  .export-tools {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin: 18px 0;
+  }
+  .export-tools-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .export-tools-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .export-options {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    gap: 8px 12px;
+  }
+  .export-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    min-height: 28px;
+  }
+  .export-option input {
+    accent-color: var(--accent);
+  }
+  #export-render-root {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 2200px;
+    height: 1600px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
   /* ─── Footer ────────────────────────────────────────────── */
   .footer-actions {
     margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -353,6 +404,8 @@
     .source-grid { grid-template-columns: 1fr; }
     .source-panel, .upload-card { padding: 28px 22px; }
     .iseq-form { grid-template-columns: 1fr; }
+    .export-tools-head { align-items: flex-start; flex-direction: column; }
+    .export-options { grid-template-columns: 1fr; }
     .stats-bar { grid-template-columns: repeat(2,1fr); }
     .charts-grid-bottom { grid-template-columns: 1fr; }
     .param-stats { grid-template-columns: repeat(3,1fr); }
@@ -374,6 +427,7 @@
 
 <!-- Error toast -->
 <div id="toast"></div>
+<div id="export-render-root" aria-hidden="true"></div>
 
 <!-- Header -->
 <header>
@@ -518,6 +572,18 @@ const PLOT_CONFIG = {
   scrollZoom: true,
   displaylogo: false
 };
+const EXPORT_CONFIG = { responsive:false, staticPlot:true, displayModeBar:false, displaylogo:false };
+const EXPORT_OPTIONS = [
+  { key:'complete', label:'Relatório completo', default:true },
+  { key:'timeSeries', label:'Série temporal', default:true },
+  { key:'histogram', label:'Distribuição de frequências', default:true },
+  { key:'dailyBoxplot', label:'Boxplot diário', default:true },
+  { key:'diurnal', label:'Perfil diurno médio', default:true },
+  { key:'dailyVariability', label:'Médias diárias + variabilidade', default:true },
+  { key:'qq', label:'Q-Q plot', default:true },
+  { key:'weekdayBoxplot', label:'Boxplot semanal', default:false },
+];
+const EXPORT_CONTEXTS = {};
 
 function finiteVals(arr) {
   return arr.filter(v => Number.isFinite(v));
@@ -742,7 +808,7 @@ function filterParam(rows, col, cfg) {
 function dailyStats(rows) {
   const map={};
   rows.forEach(({dt,v})=>{
-    const k=dt.toISOString().slice(0,10);
+    const k=localDateKey(dt);
     if(!map[k]) map[k]={sum:0,count:0,min:Infinity,max:-Infinity,vals:[]};
     map[k].sum+=v; map[k].count++; map[k].vals.push(v);
     if(v<map[k].min) map[k].min=v; if(v>map[k].max) map[k].max=v;
@@ -753,6 +819,37 @@ function dailyStats(rows) {
     means: keys.map(k=>map[k].sum/map[k].count),
     mins:  keys.map(k=>map[k].min),
     maxs:  keys.map(k=>map[k].max),
+  };
+}
+
+function localDateKey(dt) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+}
+
+function shortDateLabel(value) {
+  const d = value instanceof Date ? value : new Date(`${value}T00:00:00`);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function dailyDetailedStats(rows) {
+  const map = {};
+  rows.forEach(({dt,v}) => {
+    const k = localDateKey(dt);
+    if(!map[k]) map[k] = [];
+    map[k].push(v);
+  });
+  const keys = Object.keys(map).sort();
+  return {
+    keys,
+    dates: keys.map(k => new Date(`${k}T00:00:00`)),
+    labels: keys.map(shortDateLabel),
+    values: keys.map(k => map[k]),
+    means: keys.map(k => mean(map[k])),
+    medians: keys.map(k => median(map[k])),
+    stds: keys.map(k => std(map[k])),
+    mins: keys.map(k => minMax(map[k]).min),
+    maxs: keys.map(k => minMax(map[k]).max),
   };
 }
 
@@ -959,6 +1056,166 @@ function buildBoxplot(divId, rows, cfg) {
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
 
+function exportLayout(title, width, height, extra={}) {
+  return {
+    paper_bgcolor:'#FFFFFF',
+    plot_bgcolor:'#F8FAFC',
+    width,
+    height,
+    title:{text:title, font:{size:20, color:'#111827', family:'Arial, sans-serif'}},
+    font:{family:'Arial, sans-serif', color:'#111827', size:13},
+    margin:{t:58, b:62, l:72, r:28},
+    xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', zerolinecolor:'#E5E7EB'},
+    yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', zerolinecolor:'#E5E7EB'},
+    legend:{orientation:'h', x:0, y:1.12, bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#E5E7EB', borderwidth:1, font:{size:11}},
+    hoverlabel:{bgcolor:'#FFFFFF', bordercolor:'#CBD5E1', font:{color:'#111827'}},
+    ...extra,
+  };
+}
+
+function exportRefShapes(cfg) {
+  const shapes = [];
+  const annotations = [];
+  const add = (value, label, color, dash='dash') => {
+    shapes.push({type:'line', x0:0, x1:1, xref:'paper', y0:value, y1:value, yref:'y',
+      line:{color, width:2, dash}});
+    annotations.push({x:1, xref:'paper', y:value, yref:'y', text:label, showarrow:false,
+      xanchor:'right', yanchor:'bottom', font:{color, size:11}, bgcolor:'rgba(255,255,255,0.8)'});
+  };
+  if(cfg.alerta != null) add(cfg.alerta, 'Alerta', '#F59E0B');
+  if(cfg.critico != null) add(cfg.critico, 'Crítico', '#EF4444');
+  cfg.refs.forEach(ref => add(ref.valor, ref.label, ref.cor, ref.dash));
+  return {shapes, annotations};
+}
+
+function exportChartSpec(kind, rows, cfg, width=900, height=560) {
+  const vals = rows.map(r => r.v);
+  const unitTitle = `${cfg.nome} (${cfg.unidade})`;
+
+  if(kind === 'timeSeries') {
+    const d = dailyStats(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:[
+        { name:'Mín/Máx diário', x:[...d.dates,...[...d.dates].reverse()], y:[...d.maxs,...[...d.mins].reverse()],
+          fill:'toself', fillcolor:cfg.corClara, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
+        { name:'Média diária', x:d.dates, y:d.means, mode:'lines+markers', line:{color:cfg.cor,width:3}, marker:{size:5}, type:'scatter' },
+      ],
+      layout:exportLayout(`Série Temporal - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', type:'date', title:{text:'Data'}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'histogram') {
+    const st = computeStats(vals);
+    return {
+      traces:[{x:vals, type:'histogram', histnorm:'probability density', nbinsx:42, name:'Frequência',
+        marker:{color:cfg.cor, opacity:0.72, line:{color:'#FFFFFF', width:1}}}],
+      layout:exportLayout(`Distribuição de Frequências - ${cfg.nome}`, width, height, {
+        shapes:[
+          {type:'line', x0:st.mean, x1:st.mean, y0:0, y1:1, xref:'x', yref:'paper', line:{color:'#EF4444', width:2, dash:'dash'}},
+          {type:'line', x0:st.median, x1:st.median, y0:0, y1:1, xref:'x', yref:'paper', line:{color:'#2563EB', width:2, dash:'dot'}},
+        ],
+        annotations:[
+          {x:st.mean, y:1, xref:'x', yref:'paper', text:`Média: ${fmt(st.mean)}`, showarrow:false, yanchor:'bottom', font:{color:'#EF4444'}},
+          {x:st.median, y:0.92, xref:'x', yref:'paper', text:`Mediana: ${fmt(st.median)}`, showarrow:false, yanchor:'bottom', font:{color:'#2563EB'}},
+        ],
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Densidade'}},
+        showlegend:false,
+      })
+    };
+  }
+
+  if(kind === 'dailyBoxplot') {
+    const d = dailyDetailedStats(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:d.keys.map((key, i) => ({y:d.values[i], type:'box', name:d.labels[i], marker:{color:cfg.cor, size:3, opacity:0.45},
+        line:{color:cfg.cor}, fillcolor:cfg.corClara, boxmean:true})),
+      layout:exportLayout(`Boxplot Diário - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations, showlegend:false,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickangle:-45},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'diurnal') {
+    const h = hourlyStats(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:[
+        {name:'Mín/Máx', x:[...h.hours,...[...h.hours].reverse()], y:[...h.maxs,...[...h.mins].reverse()],
+          fill:'toself', fillcolor:cfg.corClara, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip'},
+        {name:'Média', x:h.hours, y:h.means, mode:'lines+markers', line:{color:cfg.cor,width:3}, marker:{size:6}, type:'scatter'},
+        {name:'Mediana', x:h.hours, y:h.medians, mode:'lines', line:{color:'#111827',width:1.5,dash:'dot'}, type:'scatter'},
+      ],
+      layout:exportLayout(`Perfil Diurno Médio - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickvals:Array.from({length:24},(_,i)=>i), title:{text:'Hora do dia'}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'dailyVariability') {
+    const d = dailyDetailedStats(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:[
+        {name:'Média diária', x:d.labels, y:d.means, type:'bar', marker:{color:cfg.cor, opacity:0.78},
+          error_y:{type:'data', array:d.stds, visible:true, color:'#111827', thickness:1}},
+        {name:'Mín', x:d.labels, y:d.mins, type:'scatter', mode:'markers', marker:{color:'#1D4ED8', symbol:'triangle-down', size:7}},
+        {name:'Máx', x:d.labels, y:d.maxs, type:'scatter', mode:'markers', marker:{color:'#EF4444', symbol:'triangle-up', size:7}},
+      ],
+      layout:exportLayout(`Médias Diárias com Variabilidade - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickangle:-45, title:{text:'Dia'}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'qq') {
+    const qq = computeQQ(vals);
+    const lx=[qq.theoretical[0], qq.theoretical[qq.theoretical.length-1]];
+    const ly=lx.map(x=>qq.slope*x+qq.intercept);
+    return {
+      traces:[
+        {x:qq.theoretical, y:qq.observed, mode:'markers', type:'scatter', name:'Dados',
+          marker:{color:cfg.cor, size:5, opacity:0.65}},
+        {x:lx, y:ly, mode:'lines', type:'scatter', name:'Linha normal', line:{color:'#111827', width:2}},
+      ],
+      layout:exportLayout(`Q-Q Plot (Normalidade) - ${cfg.nome}`, width, height, {
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Quantis teóricos'}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Quantis observados'}},
+        annotations:[{x:0.98, y:0.05, xref:'paper', yref:'paper', text:`R² = ${qq.r2.toFixed(3)}`, showarrow:false,
+          xanchor:'right', yanchor:'bottom', bgcolor:'#FFFFFF', bordercolor:'#CBD5E1', borderwidth:1, borderpad:5}],
+      })
+    };
+  }
+
+  if(kind === 'weekdayBoxplot') {
+    const groups = weekdayBoxplot(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:DIAS.map((dia,i)=>({y:groups[i], type:'box', name:dia, marker:{color:cfg.cor, size:3, opacity:0.5},
+        line:{color:cfg.cor}, fillcolor:cfg.corClara, boxmean:true})),
+      layout:exportLayout(`Boxplot por Dia da Semana - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations, showlegend:false,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF'},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  throw new Error(`Exportação desconhecida: ${kind}`);
+}
+
 // ═══════════════════════════════════════════════════════════
 // BUILD PANEL HTML & CHARTS
 // ═══════════════════════════════════════════════════════════
@@ -978,10 +1235,17 @@ function buildPanel(col, cfg, rows) {
   const qq  = `qq-${col.replace(/\./g,'_')}`;
   const bp  = `bp-${col.replace(/\./g,'_')}`;
   const slug = col.toLowerCase().replace(/\./g,'-');
+  EXPORT_CONTEXTS[col] = { col, cfg, rows, vals, slug, chartIds:{timeSeries:ts, diurnal:dp, qq, weekdayBoxplot:bp} };
 
   const refText = cfg.refs.length
     ? `<div class="ref-bar">⚠ Referências destacadas: ${cfg.refs.map(r=>r.label).join('  ·  ')}</div>`
     : '';
+  const exportOptions = EXPORT_OPTIONS.map(opt => `
+    <label class="export-option">
+      <input type="checkbox" class="export-check" data-export="${opt.key}" ${opt.default?'checked':''}/>
+      <span>${opt.label}</span>
+    </label>
+  `).join('');
 
   const container = document.getElementById('panels-container');
   const div = document.createElement('div');
@@ -997,6 +1261,16 @@ function buildPanel(col, cfg, rows) {
       <div class="pstat"><div class="lbl">P95</div><div class="val">${fmt(st.p95)}</div></div>
     </div>
     ${refText}
+    <div class="export-tools">
+      <div class="export-tools-head">
+        <div>
+          <div class="export-tools-title">Exportação estatística</div>
+          <span class="info-text">Selecione as imagens e baixe um pacote ZIP para ${cfg.nome}</span>
+        </div>
+        <button class="btn btn-outline" type="button" onclick="exportStatsPackage('${col}')">⬇ Baixar pacote</button>
+      </div>
+      <div class="export-options">${exportOptions}</div>
+    </div>
     <div class="chart-card charts-grid-top">
       <div class="chart-topbar">
         <div class="chart-title">SÉRIE TEMPORAL — ${cfg.nome} (${cfg.unidade})</div>
@@ -1073,6 +1347,193 @@ function downloadChart(divId, fileName) {
     console.error(err);
     showToast('Não foi possível baixar o gráfico.');
   });
+}
+
+async function exportStatsPackage(col) {
+  const ctx = EXPORT_CONTEXTS[col];
+  if(!ctx) {
+    showToast('Parâmetro não encontrado para exportação.');
+    return;
+  }
+  if(!window.JSZip) {
+    showToast('Biblioteca ZIP não carregada. Verifique a conexão e recarregue a página.');
+    return;
+  }
+
+  const panel = document.getElementById(`panel-${col.replace(/\./g,'_')}`);
+  const selected = Array.from(panel.querySelectorAll('.export-check:checked')).map(el => el.dataset.export);
+  if(!selected.length) {
+    showToast('Selecione ao menos uma imagem para exportar.');
+    return;
+  }
+
+  showLoading(`Gerando pacote de imagens: ${ctx.cfg.nome}…`);
+  try {
+    const zip = new JSZip();
+    for (const key of selected) {
+      const option = EXPORT_OPTIONS.find(opt => opt.key === key);
+      loadingMsg(`Gerando ${option?.label || key}…`);
+      const dataUrl = key === 'complete'
+        ? await createCompleteReportImage(ctx)
+        : await createExportChartImage(key, ctx);
+      zip.file(`${ctx.slug}-${key}.png`, dataUrlToBlob(dataUrl));
+    }
+    loadingMsg('Compactando imagens…');
+    const blob = await zip.generateAsync({type:'blob'});
+    downloadBlob(blob, `${ctx.slug}-imagens-estatisticas.zip`);
+    hideLoading();
+  } catch(err) {
+    hideLoading();
+    console.error(err);
+    showToast(`Não foi possível gerar o pacote: ${err.message}`);
+  }
+}
+
+async function createExportChartImage(kind, ctx, width=1300, height=820) {
+  const spec = exportChartSpec(kind, ctx.rows, ctx.cfg, width, height);
+  return renderSpecToImage(spec, width, height);
+}
+
+async function renderSpecToImage(spec, width, height) {
+  const root = document.getElementById('export-render-root');
+  const div = document.createElement('div');
+  div.style.width = `${width}px`;
+  div.style.height = `${height}px`;
+  root.appendChild(div);
+  try {
+    await Plotly.newPlot(div, spec.traces, spec.layout, EXPORT_CONFIG);
+    return await Plotly.toImage(div, {format:'png', width, height, scale:1});
+  } finally {
+    Plotly.purge(div);
+    div.remove();
+  }
+}
+
+async function createCompleteReportImage(ctx) {
+  const chartJobs = [
+    ['timeSeries', 1420, 320],
+    ['histogram', 460, 300],
+    ['dailyBoxplot', 460, 300],
+    ['diurnal', 460, 300],
+    ['dailyVariability', 920, 320],
+    ['qq', 460, 320],
+  ];
+  const chartUrls = {};
+  for (const [kind, width, height] of chartJobs) {
+    chartUrls[kind] = await createExportChartImage(kind, ctx, width, height);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1600;
+  canvas.height = 1200;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#FFFFFF';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+
+  const period = exportPeriodLabel(ctx.rows);
+  c.fillStyle = '#111827';
+  c.textAlign = 'center';
+  c.font = '700 26px Arial, sans-serif';
+  c.fillText(`Análise Estatística Completa - ${ctx.cfg.nome}`, 800, 34);
+  c.font = '700 20px Arial, sans-serif';
+  c.fillText(period, 800, 60);
+
+  drawSummaryStrip(c, ctx, 70, 82, 1460, 72);
+  await drawDataUrl(c, chartUrls.timeSeries, 90, 170, 1420, 320);
+  await drawDataUrl(c, chartUrls.histogram, 90, 525, 460, 300);
+  await drawDataUrl(c, chartUrls.dailyBoxplot, 570, 525, 460, 300);
+  await drawDataUrl(c, chartUrls.diurnal, 1050, 525, 460, 300);
+  await drawDataUrl(c, chartUrls.dailyVariability, 90, 860, 920, 320);
+  await drawDataUrl(c, chartUrls.qq, 1050, 860, 460, 320);
+
+  c.fillStyle = '#6B7280';
+  c.textAlign = 'right';
+  c.font = '12px Arial, sans-serif';
+  c.fillText(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 1510, 1188);
+  return canvas.toDataURL('image/png');
+}
+
+function drawSummaryStrip(c, ctx, x, y, width, height) {
+  const vals = ctx.rows.map(r => r.v);
+  const st = computeStats(vals);
+  const fields = [
+    ['N', st.n.toLocaleString('pt-BR')],
+    ['Média', fmt(st.mean)],
+    ['Mediana', fmt(st.median)],
+    ['Desvio padrão', fmt(st.std)],
+    ['Mín → Máx', `${fmt(st.min)} → ${fmt(st.max)}`],
+    ['P95', fmt(st.p95)],
+  ];
+  const gap = 12;
+  const cardW = (width - gap * (fields.length - 1)) / fields.length;
+  fields.forEach(([label, value], i) => {
+    const cx = x + i * (cardW + gap);
+    roundedRect(c, cx, y, cardW, height, 10, '#F8FAFC', '#D1D5DB');
+    c.textAlign = 'left';
+    c.fillStyle = '#64748B';
+    c.font = '700 12px Arial, sans-serif';
+    c.fillText(label.toUpperCase(), cx + 16, y + 24);
+    c.fillStyle = '#111827';
+    c.font = '700 18px Arial, sans-serif';
+    c.fillText(value, cx + 16, y + 52);
+  });
+}
+
+function roundedRect(c, x, y, width, height, radius, fill, stroke) {
+  c.beginPath();
+  c.moveTo(x + radius, y);
+  c.lineTo(x + width - radius, y);
+  c.quadraticCurveTo(x + width, y, x + width, y + radius);
+  c.lineTo(x + width, y + height - radius);
+  c.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  c.lineTo(x + radius, y + height);
+  c.quadraticCurveTo(x, y + height, x, y + height - radius);
+  c.lineTo(x, y + radius);
+  c.quadraticCurveTo(x, y, x + radius, y);
+  c.closePath();
+  c.fillStyle = fill;
+  c.fill();
+  c.strokeStyle = stroke;
+  c.lineWidth = 1;
+  c.stroke();
+}
+
+function exportPeriodLabel(rows) {
+  const range = minMax(rows.map(r => r.dt));
+  if(!range) return '';
+  return `${fmtDate(new Date(range.min))} - ${fmtDate(new Date(range.max))}`;
+}
+
+function drawDataUrl(c, dataUrl, x, y, width, height) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      c.drawImage(img, x, y, width, height);
+      resolve();
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, data] = dataUrl.split(',');
+  const mime = (meta.match(/data:(.*?);/) || [])[1] || 'image/png';
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0; i<binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], {type:mime});
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function switchTab(col) {
