@@ -16,7 +16,26 @@ Abra `index_completo_corrigido.html` no navegador. O upload aceita:
 
 ## Backend ISEQ
 
-O backend fica em `backend/` e expõe jobs para buscar dados por intervalo. Enquanto a automação autenticada do site não estiver plugada, ele pode ser testado com arquivos `.xlsx` já exportados:
+O backend fica em `backend/` e expõe jobs para buscar dados por intervalo. Para testar localmente sem instalar dependências e usando a API do ISEQ:
+
+```powershell
+cd backend
+$env:ISEQ_BEARER_TOKEN="COLE_SEU_TOKEN_AQUI"
+python dev_server.py
+```
+
+Nao salve esse token no GitHub. Se ele expirar, faca login novamente no ISEQ e atualize a variavel.
+
+Para testar com arquivos `.xlsx` ja exportados:
+
+```powershell
+cd backend
+python dev_server.py
+```
+
+Abra o painel e mantenha a URL do backend como `http://127.0.0.1:8000`.
+
+Para rodar com FastAPI, igual ao deploy:
 
 ```powershell
 cd backend

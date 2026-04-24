@@ -10,7 +10,7 @@ import time
 import uuid
 
 from .collector import CollectorNotConfigured, ExportTask, build_collector, build_export_tasks
-from .iseq_parser import merge_iseq_xlsx
+from .iseq_parser import parse_iseq_xlsx, records_to_wide_rows
 
 
 MAX_RETRY_SECONDS = 15 * 60
@@ -139,7 +139,15 @@ class JobStore:
 
     def _finalize_job(self, job: JobState) -> None:
         files = [task.file_path for task in job.tasks if task.file_path]
-        data = merge_iseq_xlsx(files)
+        start = datetime.fromisoformat(job.start)
+        end = datetime.fromisoformat(job.end)
+        records = []
+        for file_path in files:
+            records.extend(
+                record for record in parse_iseq_xlsx(file_path)
+                if start <= record.data_local <= end
+            )
+        data = records_to_wide_rows(records)
         data_path = self._job_dir(job.id) / "data.json"
         data_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         with self.lock:

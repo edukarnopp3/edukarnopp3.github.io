@@ -4,6 +4,27 @@ Backend FastAPI para gerar jobs de exportação ISEQ, juntar arquivos `.xlsx` po
 
 ## Rodar localmente
 
+Modo simples, sem instalar FastAPI, usando a API do ISEQ:
+
+```powershell
+cd backend
+$env:ISEQ_BEARER_TOKEN="COLE_SEU_TOKEN_AQUI"
+python dev_server.py
+```
+
+O token deve vir do login atual do ISEQ e nao deve ser salvo no GitHub. Se ele expirar, faca login de novo no ISEQ e atualize essa variavel.
+
+Modo simples, sem instalar FastAPI, usando arquivos ja baixados:
+
+```powershell
+cd backend
+python dev_server.py
+```
+
+Sem `ISEQ_BEARER_TOKEN`, esse modo usa automaticamente a pasta `Downloads` como fonte dos `.xlsx` ja exportados do ISEQ. Com o servidor aberto, use `http://127.0.0.1:8000` no painel.
+
+Modo FastAPI, igual ao deploy:
+
 ```powershell
 cd backend
 python -m venv .venv
@@ -13,7 +34,7 @@ $env:ISEQ_EXPORT_DIR="C:\Users\eduardo\Downloads"
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Com `ISEQ_EXPORT_DIR`, o backend usa arquivos já exportados do ISEQ para testar a API. A automação autenticada real do site deve ser implementada em `app/collector.py`, substituindo o coletor local.
+Use `ISEQ_BEARER_TOKEN` para baixar pela API do ISEQ. Use `ISEQ_EXPORT_DIR` apenas para testar com arquivos ja exportados.
 
 ## Endpoints
 
