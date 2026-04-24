@@ -54,6 +54,11 @@ class JobStore:
         self.jobs: dict[str, JobState] = {}
         self.lock = threading.RLock()
         self.collector = build_collector()
+        try:
+            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "3"))
+        except ValueError:
+            configured_workers = 3
+        self.max_workers = max(1, min(configured_workers, 6))
 
     def create_job(self, equipment_id: str, start: datetime, end: datetime) -> JobState:
         job_id = uuid.uuid4().hex[:12]
@@ -91,36 +96,74 @@ class JobStore:
         return json.loads(data_path.read_text(encoding="utf-8"))
 
     def _run_job(self, job_id: str) -> None:
+        with self.lock:
+            job = self.jobs[job_id]
+            worker_count = min(self.max_workers, max(1, job.total_tasks))
+            job.status = "running"
+            job.message = f"Exportando parâmetros com {worker_count} tarefas em paralelo."
+            job.updated_at = datetime.now().isoformat(timespec="seconds")
+            self._save_job(job)
+
+        workers = [
+            threading.Thread(target=self._run_job_worker, args=(job_id,), daemon=True)
+            for _ in range(worker_count)
+        ]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+
+        with self.lock:
+            job = self.jobs[job_id]
+            if not all(task.status == "completed" for task in job.tasks):
+                return
+            job.message = "Combinando arquivos exportados."
+            job.updated_at = datetime.now().isoformat(timespec="seconds")
+            self._save_job(job)
+        self._finalize_job(job)
+
+    def _run_job_worker(self, job_id: str) -> None:
         while True:
             with self.lock:
                 job = self.jobs[job_id]
-                pending = next((task for task in job.tasks if task.status != "completed"), None)
+                pending = next((task for task in job.tasks if task.status == "pending"), None)
                 if pending is None:
-                    self._finalize_job(job)
                     return
+            self._run_task_until_complete(job_id, pending)
+
+    def _run_task_until_complete(self, job_id: str, task: TaskState) -> None:
+        while True:
+            with self.lock:
+                job = self.jobs[job_id]
                 job.status = "running"
-                job.message = f"Exportando {pending.parameter} ({pending.start} a {pending.end})."
-                pending.status = "running"
-                pending.attempts += 1
+                task.status = "running"
+                task.attempts += 1
+                active = sum(1 for item in job.tasks if item.status == "running")
+                job.message = (
+                    f"Exportando {task.parameter} ({task.start} a {task.end}) "
+                    f"com {active} tarefas ativas."
+                )
                 job.updated_at = datetime.now().isoformat(timespec="seconds")
                 self._save_job(job)
 
             try:
-                file_path = self.collector.fetch_export(self._state_to_task(pending), self._job_export_dir(job_id))
+                file_path = self.collector.fetch_export(self._state_to_task(task), self._job_export_dir(job_id))
                 with self.lock:
                     job = self.jobs[job_id]
-                    pending.status = "completed"
-                    pending.file_path = str(file_path)
-                    pending.last_error = None
-                    pending.next_retry_at = None
-                    job.completed_tasks = sum(1 for task in job.tasks if task.status == "completed")
-                    job.message = f"{pending.parameter} concluído ({job.completed_tasks}/{job.total_tasks})."
+                    task.status = "completed"
+                    task.file_path = str(file_path)
+                    task.last_error = None
+                    task.next_retry_at = None
+                    job.completed_tasks = sum(1 for item in job.tasks if item.status == "completed")
+                    active = sum(1 for item in job.tasks if item.status == "running")
+                    job.message = f"{task.parameter} concluído ({job.completed_tasks}/{job.total_tasks}); {active} tarefas ativas."
                     job.updated_at = datetime.now().isoformat(timespec="seconds")
                     self._save_job(job)
+                return
             except CollectorNotConfigured as exc:
-                self._record_retry(job_id, pending, exc, configuration_block=True)
+                self._record_retry(job_id, task, exc, configuration_block=True)
             except Exception as exc:
-                self._record_retry(job_id, pending, exc)
+                self._record_retry(job_id, task, exc)
 
     def _record_retry(self, job_id: str, task: TaskState, exc: Exception, configuration_block: bool = False) -> None:
         delay = MAX_RETRY_SECONDS if configuration_block else min(2 ** min(task.attempts, 8), MAX_RETRY_SECONDS)

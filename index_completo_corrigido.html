@@ -197,6 +197,37 @@
     font-size: 12px;
     min-height: 46px;
   }
+  .status-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .status-percent {
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    white-space: nowrap;
+  }
+  .status-progress {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(88,166,255,0.13);
+    margin-bottom: 8px;
+  }
+  .status-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), #79C0FF);
+    transition: width 0.35s ease;
+  }
+  .status-detail {
+    color: var(--muted);
+    line-height: 1.45;
+  }
   .status-box.error {
     background: rgba(192,57,43,0.1);
     border-color: rgba(192,57,43,0.35);
@@ -463,10 +494,7 @@
       <h2>Buscar dados do ISEQ</h2>
       <p>Cria uma tarefa no backend para baixar todos os parâmetros conhecidos e juntar o intervalo solicitado.</p>
       <form class="iseq-form" id="iseq-form">
-        <div class="field field-full">
-          <label for="backend-url">URL do backend</label>
-          <input id="backend-url" type="url" placeholder="http://127.0.0.1:8000"/>
-        </div>
+        <input id="backend-url" type="hidden" value="http://127.0.0.1:8000"/>
         <div class="field field-full">
           <label for="equipment-id">Equipamento</label>
           <input id="equipment-id" type="text" value="1C:69:20:C7:31:D8"/>
@@ -1658,18 +1686,18 @@ function renderRows(rows, sourceLabel) {
 
 async function startIseqJob(event) {
   event.preventDefault();
-  const backendUrl = document.getElementById('backend-url').value.trim().replace(/\/+$/, '');
+  const backendUrl = getBackendUrl();
   const equipmentId = document.getElementById('equipment-id').value.trim();
   const start = normalizeInputDate(document.getElementById('start-date').value);
   const end = normalizeInputDate(document.getElementById('end-date').value);
 
-  if(!backendUrl || !equipmentId || !start || !end) {
-    setIseqStatus('Preencha backend, equipamento, início e fim.', 'error');
+  if(!equipmentId || !start || !end) {
+    setIseqStatus('Preencha equipamento, início e fim.', 'error');
     return;
   }
 
   localStorage.setItem('iseqBackendUrl', backendUrl);
-  setIseqStatus('Criando tarefa no backend…');
+  setIseqProgress({status:'queued', total_tasks:0, completed_tasks:0, message:'Criando tarefa no backend...'});
 
   try {
     const created = await fetchJson(`${backendUrl}/api/iseq/jobs`, {
@@ -1687,8 +1715,7 @@ async function pollIseqJob(backendUrl, jobId) {
   let job = null;
   while(true) {
     job = await fetchJson(`${backendUrl}/api/iseq/jobs/${jobId}`);
-    const progress = `${job.completed_tasks || 0}/${job.total_tasks || 0}`;
-    setIseqStatus(`Job ${job.id}: ${job.status} · ${progress} · ${job.message || ''}`, job.status === 'completed' ? 'done' : '');
+    setIseqProgress(job);
 
     if(job.status === 'completed') break;
     await sleep(3000);
@@ -1705,6 +1732,11 @@ function normalizeInputDate(value) {
   return value.length === 16 ? `${value}:00` : value;
 }
 
+function getBackendUrl() {
+  const inputValue = document.getElementById('backend-url')?.value || '';
+  return (inputValue.trim() || DEFAULT_BACKEND_URL).replace(/\/+$/, '');
+}
+
 async function fetchJson(url, options) {
   const res = await fetch(url, options);
   const data = await res.json().catch(()=>({}));
@@ -1717,6 +1749,35 @@ function setIseqStatus(message, kind='') {
   el.textContent = message;
   el.classList.toggle('error', kind === 'error');
   el.classList.toggle('done', kind === 'done');
+}
+
+function setIseqProgress(job) {
+  const total = Number(job.total_tasks || 0);
+  const completed = Number(job.completed_tasks || 0);
+  const percent = total ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 0;
+  const done = job.status === 'completed';
+  const title = done ? 'Exportação concluída' : 'Exportando parâmetros';
+  const detail = job.message || (done ? 'Dados prontos para análise.' : 'Aguardando resposta do backend...');
+  const progressText = total ? `${completed}/${total}` : 'iniciando';
+  const el = document.getElementById('iseq-status');
+  el.classList.toggle('error', false);
+  el.classList.toggle('done', done);
+  el.innerHTML = `
+    <div class="status-title">
+      <span>${title}</span>
+      <span class="status-percent">${percent}%</span>
+    </div>
+    <div class="status-progress" aria-label="Progresso da exportação">
+      <div class="status-bar" style="width:${percent}%"></div>
+    </div>
+    <div class="status-detail">${escapeHtml(progressText)} - ${escapeHtml(detail)}</div>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
 }
 
 function sleep(ms) {
