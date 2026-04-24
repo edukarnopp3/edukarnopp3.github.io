@@ -4,6 +4,22 @@ Backend FastAPI para gerar jobs de exportação ISEQ, juntar arquivos `.xlsx` po
 
 ## Rodar localmente
 
+Modo assistido, sem copiar token manualmente:
+
+```powershell
+cd backend
+python login_and_run.py
+```
+
+Na primeira vez, se aparecer aviso de Playwright ausente, instale com:
+
+```powershell
+pip install playwright
+python -m playwright install chromium
+```
+
+Esse modo abre uma janela de login do ISEQ, espera voce entrar, captura o token localmente e sobe o backend em `http://127.0.0.1:8000`. O token nao e impresso nem salvo no repositorio.
+
 Modo simples, sem instalar FastAPI, usando a API do ISEQ:
 
 ```powershell

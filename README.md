@@ -16,7 +16,23 @@ Abra `index_completo_corrigido.html` no navegador. O upload aceita:
 
 ## Backend ISEQ
 
-O backend fica em `backend/` e expõe jobs para buscar dados por intervalo. Para testar localmente sem instalar dependências e usando a API do ISEQ:
+O backend fica em `backend/` e expõe jobs para buscar dados por intervalo. Para iniciar com login assistido, sem copiar token manualmente:
+
+```powershell
+cd backend
+python login_and_run.py
+```
+
+Na primeira vez, se aparecer aviso de Playwright ausente, instale com:
+
+```powershell
+pip install playwright
+python -m playwright install chromium
+```
+
+Esse modo abre o ISEQ, espera voce fazer login e inicia o backend em `http://127.0.0.1:8000` sem imprimir o token.
+
+Para testar localmente sem instalar FastAPI e usando token manual:
 
 ```powershell
 cd backend

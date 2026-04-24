@@ -523,12 +523,27 @@ function finiteVals(arr) {
   return arr.filter(v => Number.isFinite(v));
 }
 
+function minMax(values) {
+  let min = Infinity;
+  let max = -Infinity;
+  let count = 0;
+  values.forEach(value => {
+    const n = value instanceof Date ? value.getTime() : value;
+    if (!Number.isFinite(n)) return;
+    if (n < min) min = n;
+    if (n > max) max = n;
+    count++;
+  });
+  return count ? { min, max } : null;
+}
+
 function paddedRange(arr, pad = 0.12) {
   const vals = finiteVals(arr);
   if (!vals.length) return null;
 
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
+  const mm = minMax(vals);
+  if (!mm) return null;
+  const { min, max } = mm;
 
   if (min === max) {
     const delta = Math.abs(min || 1) * 0.15 || 1;
@@ -755,8 +770,8 @@ function hourlyStats(rows) {
     hours,
     means: hours.map(h => map[h].vals.length ? mean(map[h].vals) : null),
     medians: hours.map(h => map[h].vals.length ? median(map[h].vals) : null),
-    mins: hours.map(h => map[h].vals.length ? Math.min(...map[h].vals) : null),
-    maxs: hours.map(h => map[h].vals.length ? Math.max(...map[h].vals) : null),
+    mins: hours.map(h => map[h].vals.length ? minMax(map[h].vals).min : null),
+    maxs: hours.map(h => map[h].vals.length ? minMax(map[h].vals).max : null),
   };
 }
 
@@ -1124,8 +1139,10 @@ function renderRows(rows, sourceLabel) {
   loadingMsg('Calculando estatísticas…');
   const totalRows = rows.length;
   const allDates = rows.map(r=>r._dt);
-  const dMin = new Date(Math.min(...allDates));
-  const dMax = new Date(Math.max(...allDates));
+  const dateRange = minMax(allDates);
+  if(!dateRange) throw new Error('Nenhuma data válida encontrada.');
+  const dMin = new Date(dateRange.min);
+  const dMax = new Date(dateRange.max);
   const nDays = Math.round((dMax-dMin)/864e5)+1;
 
   const availParams = Object.entries(PARAMS).filter(([k])=>rows.some(r=>r[k] != null));
