@@ -698,7 +698,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.3</span>
+    <span class="badge">v2.4</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -742,7 +742,10 @@
           <select id="job-workers">
             <option value="1">1</option>
             <option value="2">2</option>
-            <option value="3" selected>3</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6" selected>6</option>
           </select>
         </div>
         <div class="iseq-actions">
@@ -3037,7 +3040,7 @@ async function startIseqJob(event) {
   const equipmentId = document.getElementById('equipment-id').value.trim();
   const start = normalizeInputDate(document.getElementById('start-date').value);
   const end = normalizeInputDate(document.getElementById('end-date').value);
-  const workers = Number(document.getElementById('job-workers')?.value || 3);
+  const workers = Number(document.getElementById('job-workers')?.value || 6);
 
   if(!equipmentId || !start || !end) {
     setIseqStatus('Preencha equipamento, início e fim.', 'error');

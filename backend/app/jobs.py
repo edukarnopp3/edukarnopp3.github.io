@@ -67,9 +67,9 @@ class JobStore:
         self.lock = threading.RLock()
         self.collector = build_collector()
         try:
-            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "3"))
+            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "6"))
         except ValueError:
-            configured_workers = 3
+            configured_workers = 6
         self.default_workers = self._normalize_worker_count(configured_workers)
 
     def create_job(self, equipment_id: str, start: datetime, end: datetime, workers: object | None = None) -> JobState:
@@ -300,11 +300,11 @@ class JobStore:
 
     def _normalize_worker_count(self, value: object | None) -> int:
         if value is None or value == "":
-            return self.default_workers if hasattr(self, "default_workers") else 3
+            return self.default_workers if hasattr(self, "default_workers") else 6
         try:
             parsed = int(value)
         except (TypeError, ValueError):
-            parsed = self.default_workers if hasattr(self, "default_workers") else 3
+            parsed = self.default_workers if hasattr(self, "default_workers") else 6
         return max(1, min(parsed, 6))
 
     def _finalize_job(self, job: JobState) -> None:
