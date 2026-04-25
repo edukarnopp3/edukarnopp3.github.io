@@ -20,7 +20,7 @@ python -m playwright install chromium
 
 Esse modo abre uma janela de login do ISEQ, espera voce entrar, captura o token localmente e sobe o backend em `http://127.0.0.1:8000`. O token nao e impresso nem salvo no repositorio.
 
-Por padrao, o backend baixa 1 relatorio por vez e divide o periodo em blocos de 7 dias. Essa configuracao e mais lenta, mas evita os erros `504 Gateway Time-out` que aparecem em relatorios grandes, principalmente CO2.
+Por padrao, o backend baixa 1 relatorio por vez e divide o periodo em blocos de 1 dia. Essa configuracao e mais lenta, mas evita os erros `504 Gateway Time-out` que aparecem em relatorios grandes, principalmente CO2.
 
 Se o site estiver estavel, voce pode ajustar antes de iniciar:
 
@@ -30,7 +30,7 @@ $env:ISEQ_CHUNK_DAYS="14"
 python login_and_run.py
 ```
 
-Use `ISEQ_JOB_WORKERS` entre 1 e 6. Quanto maior, mais rapido tende a ficar, mas tambem aumenta a chance de o site limitar ou demorar respostas. Se a API do ISEQ comecar a dar timeout, use `1`. Use `ISEQ_CHUNK_DAYS` menor, por exemplo `3`, se os relatórios semanais ainda falharem.
+Use `ISEQ_JOB_WORKERS` entre 1 e 6. Quanto maior, mais rapido tende a ficar, mas tambem aumenta a chance de o site limitar ou demorar respostas. Se a API do ISEQ comecar a dar timeout, use `1`. Use `ISEQ_CHUNK_DAYS` maior, por exemplo `3` ou `7`, se os relatórios diarios estiverem estaveis.
 
 Modo simples, sem instalar FastAPI, usando a API do ISEQ:
 

@@ -308,7 +308,7 @@ def build_collector() -> IseqCollector:
 
 def build_export_tasks(equipment_id: str, start: datetime, end: datetime) -> list[ExportTask]:
     tasks: list[ExportTask] = []
-    chunk_days = max(1, int(os.getenv("ISEQ_CHUNK_DAYS", "7")))
+    chunk_days = max(1, int(os.getenv("ISEQ_CHUNK_DAYS", "1")))
     for parameter in KNOWN_PARAMETERS:
         for chunk_start, chunk_end in day_chunks(start, end, chunk_days):
             tasks.append(ExportTask(equipment_id=equipment_id, parameter=parameter, start=chunk_start, end=chunk_end))
