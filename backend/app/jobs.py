@@ -41,6 +41,7 @@ class JobState:
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     total_tasks: int = 0
     completed_tasks: int = 0
+    attempted_tasks: int = 0
     failed_attempts: int = 0
     message: str = "Aguardando início."
     tasks: list[TaskState] = field(default_factory=list)
@@ -165,7 +166,7 @@ class JobStore:
                 task.file_path = str(file_path)
                 task.last_error = None
                 task.next_retry_at = None
-                job.completed_tasks = sum(1 for item in job.tasks if item.status == "completed")
+                self._refresh_counts(job)
                 active = sum(1 for item in job.tasks if item.status == "running")
                 job.message = f"{task.parameter} concluído ({job.completed_tasks}/{job.total_tasks}); {active} tarefas ativas."
                 job.updated_at = datetime.now().isoformat(timespec="seconds")
@@ -185,6 +186,7 @@ class JobStore:
             task.next_retry_at = next_retry.isoformat(timespec="seconds")
             job.status = "running"
             job.failed_attempts += 1
+            self._refresh_counts(job)
             job.message = f"{task.parameter} falhou: {task.last_error}. Vou seguir com outras tarefas e tentar de novo em {delay}s."
             job.updated_at = datetime.now().isoformat(timespec="seconds")
             self._save_job(job)
@@ -222,6 +224,10 @@ class JobStore:
         pending = sum(1 for task in job.tasks if task.status == "pending")
         retrying = sum(1 for task in job.tasks if task.status == "retrying")
         return f"Aguardando novas tentativas. Pendentes: {pending}; em retentativa: {retrying}."
+
+    def _refresh_counts(self, job: JobState) -> None:
+        job.completed_tasks = sum(1 for task in job.tasks if task.status == "completed")
+        job.attempted_tasks = sum(1 for task in job.tasks if task.attempts > 0 or task.status == "completed")
 
     def _finalize_job(self, job: JobState) -> None:
         files = [task.file_path for task in job.tasks if task.file_path]

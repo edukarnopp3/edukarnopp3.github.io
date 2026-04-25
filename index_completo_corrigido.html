@@ -1759,21 +1759,26 @@ function setIseqStatus(message, kind='') {
 function setIseqProgress(job) {
   const total = Number(job.total_tasks || 0);
   const completed = Number(job.completed_tasks || 0);
+  const attempted = Number(job.attempted_tasks || 0);
   const percent = total ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 0;
+  const attemptedPercent = total ? Math.max(percent, Math.min(100, Math.round((attempted / total) * 100))) : 0;
   const done = job.status === 'completed';
   const title = done ? 'Exportação concluída' : 'Exportando parâmetros';
   const detail = job.message || (done ? 'Dados prontos para análise.' : 'Aguardando resposta do backend...');
-  const progressText = total ? `${completed}/${total}` : 'iniciando';
+  const percentLabel = percent > 0 || done ? `${percent}%` : attempted > 0 ? `${attemptedPercent}% tentado` : '0%';
+  const progressText = total
+    ? `${completed}/${total} concluídas · ${attempted}/${total} tentadas`
+    : 'iniciando';
   const el = document.getElementById('iseq-status');
   el.classList.toggle('error', false);
   el.classList.toggle('done', done);
   el.innerHTML = `
     <div class="status-title">
       <span>${title}</span>
-      <span class="status-percent">${percent}%</span>
+      <span class="status-percent">${percentLabel}</span>
     </div>
     <div class="status-progress" aria-label="Progresso da exportação">
-      <div class="status-bar" style="width:${percent}%"></div>
+      <div class="status-bar" style="width:${attemptedPercent}%"></div>
     </div>
     <div class="status-detail">${escapeHtml(progressText)} - ${escapeHtml(detail)}</div>
   `;
