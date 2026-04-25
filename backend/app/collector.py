@@ -12,7 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
-from .iseq_parser import KNOWN_PARAMETERS, month_chunks, normalize_parameter, parse_iseq_xlsx
+from .iseq_parser import KNOWN_PARAMETERS, normalize_parameter, parse_iseq_xlsx
 
 
 @dataclass(frozen=True)
@@ -308,7 +308,23 @@ def build_collector() -> IseqCollector:
 
 def build_export_tasks(equipment_id: str, start: datetime, end: datetime) -> list[ExportTask]:
     tasks: list[ExportTask] = []
+    chunk_days = max(1, int(os.getenv("ISEQ_CHUNK_DAYS", "7")))
     for parameter in KNOWN_PARAMETERS:
-        for chunk_start, chunk_end in month_chunks(start, end):
+        for chunk_start, chunk_end in day_chunks(start, end, chunk_days):
             tasks.append(ExportTask(equipment_id=equipment_id, parameter=parameter, start=chunk_start, end=chunk_end))
     return tasks
+
+
+def day_chunks(start: datetime, end: datetime, days: int) -> list[tuple[datetime, datetime]]:
+    if end < start:
+        raise ValueError("end must be after start")
+
+    chunks: list[tuple[datetime, datetime]] = []
+    cursor = start
+    while cursor <= end:
+        chunk_end = min(end, cursor + timedelta(days=days))
+        chunks.append((cursor, chunk_end))
+        cursor = chunk_end
+        if cursor == end:
+            break
+    return chunks

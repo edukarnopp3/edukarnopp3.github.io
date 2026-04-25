@@ -55,9 +55,9 @@ class JobStore:
         self.lock = threading.RLock()
         self.collector = build_collector()
         try:
-            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "2"))
+            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "1"))
         except ValueError:
-            configured_workers = 2
+            configured_workers = 1
         self.max_workers = max(1, min(configured_workers, 6))
 
     def create_job(self, equipment_id: str, start: datetime, end: datetime) -> JobState:
