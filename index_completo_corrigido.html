@@ -353,6 +353,13 @@
     padding: 16px;
     margin: 18px 0;
   }
+  .global-export-tools {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin: 18px 0 22px;
+  }
   .export-tools-head {
     display: flex;
     align-items: center;
@@ -373,6 +380,12 @@
     grid-template-columns: repeat(4, minmax(160px, 1fr));
     gap: 8px 12px;
   }
+  .export-buttons {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
   .export-option {
     display: flex;
     align-items: center;
@@ -384,6 +397,33 @@
   }
   .export-option input {
     accent-color: var(--accent);
+  }
+  .advanced-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(120px, 1fr));
+    gap: 8px;
+    margin: -6px 0 18px;
+  }
+  .metric-chip {
+    background: rgba(33, 40, 56, 0.7);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-height: 58px;
+  }
+  .metric-chip .lbl {
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .metric-chip .val {
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 5px;
+    overflow-wrap: anywhere;
   }
   #export-render-root {
     position: fixed;
@@ -437,9 +477,11 @@
     .iseq-form { grid-template-columns: 1fr; }
     .export-tools-head { align-items: flex-start; flex-direction: column; }
     .export-options { grid-template-columns: 1fr; }
+    .export-buttons { width: 100%; }
     .stats-bar { grid-template-columns: repeat(2,1fr); }
     .charts-grid-bottom { grid-template-columns: 1fr; }
     .param-stats { grid-template-columns: repeat(3,1fr); }
+    .advanced-stats-grid { grid-template-columns: repeat(2,1fr); }
     .upload-card { padding: 36px 24px; }
     .chart-topbar {
       flex-direction: column;
@@ -468,7 +510,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.1</span>
+    <span class="badge">v2.2</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -545,6 +587,21 @@
       </div>
     </div>
 
+    <div class="global-export-tools" id="global-export-tools">
+      <div class="export-tools-head">
+        <div>
+          <div class="export-tools-title">Relatório offline</div>
+          <span class="info-text">Gere a imagem final completa do parâmetro atual ou um pacote com todos os parâmetros carregados.</span>
+        </div>
+        <div class="export-buttons">
+          <button class="btn btn-outline" type="button" onclick="downloadCurrentCompleteReport()">⬇ Imagem final atual</button>
+          <button class="btn btn-outline" type="button" onclick="exportCurrentStatsPackage()">⬇ Pacote atual</button>
+          <button class="btn" type="button" onclick="exportAllStatsPackage()">⬇ Todos os parâmetros</button>
+        </div>
+      </div>
+      <div class="export-options" id="global-export-options"></div>
+    </div>
+
     <!-- Tabs -->
     <div class="tabs-wrapper">
       <div class="tabs-header" id="tabs-header"></div>
@@ -603,15 +660,22 @@ const PLOT_CONFIG = {
 const EXPORT_CONFIG = { responsive:false, staticPlot:true, displayModeBar:false, displaylogo:false };
 const EXPORT_OPTIONS = [
   { key:'complete', label:'Relatório completo', default:true },
-  { key:'timeSeries', label:'Série temporal', default:true },
+  { key:'summary', label:'Tabela estatística', default:true },
+  { key:'timeSeries', label:'Série diária', default:true },
+  { key:'hourlySeries', label:'Série horária', default:true },
   { key:'histogram', label:'Distribuição de frequências', default:true },
   { key:'dailyBoxplot', label:'Boxplot diário', default:true },
   { key:'diurnal', label:'Perfil diurno médio', default:true },
   { key:'dailyVariability', label:'Médias diárias + variabilidade', default:true },
+  { key:'heatmap', label:'Mapa dia × hora', default:true },
   { key:'qq', label:'Q-Q plot', default:true },
   { key:'weekdayBoxplot', label:'Boxplot semanal', default:false },
+  { key:'weekdayProfile', label:'Perfil por dia da semana', default:false },
+  { key:'monthlyBoxplot', label:'Boxplot mensal', default:false },
+  { key:'exceedance', label:'Excedências/limites', default:false },
 ];
 const EXPORT_CONTEXTS = {};
+let CURRENT_DATASET = { rows: [], sourceLabel: '', totalRows: 0 };
 
 function finiteVals(arr) {
   return arr.filter(v => Number.isFinite(v));
@@ -653,6 +717,7 @@ function paddedRange(arr, pad = 0.12) {
 // ═══════════════════════════════════════════════════════════
 function percentile(arr, p) {
   const s = [...arr].sort((a,b)=>a-b), n=s.length;
+  if(!n) return null;
   const idx = (p/100)*(n-1);
   const lo=Math.floor(idx), hi=Math.ceil(idx);
   return s[lo]+(idx-lo)*(s[hi]-s[lo]);
@@ -660,6 +725,24 @@ function percentile(arr, p) {
 function mean(arr) { return arr.reduce((s,v)=>s+v,0)/arr.length; }
 function median(arr) { return percentile(arr,50); }
 function std(arr) { const m=mean(arr); return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length); }
+function variance(arr) { const s = std(arr); return Number.isFinite(s) ? s * s : null; }
+function coefficientOfVariation(arr) {
+  const m = mean(arr);
+  if(!Number.isFinite(m) || Math.abs(m) < 1e-12) return null;
+  return (std(arr) / Math.abs(m)) * 100;
+}
+function skewness(arr) {
+  const s = std(arr);
+  if(!Number.isFinite(s) || s === 0) return null;
+  const m = mean(arr);
+  return mean(arr.map(v => ((v - m) / s) ** 3));
+}
+function kurtosisExcess(arr) {
+  const s = std(arr);
+  if(!Number.isFinite(s) || s === 0) return null;
+  const m = mean(arr);
+  return mean(arr.map(v => ((v - m) / s) ** 4)) - 3;
+}
 
 // Normal quantile (probit) — Beasley-Springer-Moro approximation
 function normPPF(p) {
@@ -900,6 +983,45 @@ function hourlyStats(rows) {
   };
 }
 
+function hourlySeriesStats(rows) {
+  const map = {};
+  rows.forEach(({dt,v}) => {
+    const key = `${localDateKey(dt)}T${String(dt.getHours()).padStart(2,'0')}:00:00`;
+    if(!map[key]) map[key] = [];
+    map[key].push(v);
+  });
+  const keys = Object.keys(map).sort();
+  return {
+    dates: keys.map(k => new Date(k)),
+    means: keys.map(k => mean(map[k])),
+    mins: keys.map(k => minMax(map[k]).min),
+    maxs: keys.map(k => minMax(map[k]).max),
+    counts: keys.map(k => map[k].length),
+  };
+}
+
+function heatmapStats(rows) {
+  const map = {};
+  rows.forEach(({dt,v}) => {
+    const day = localDateKey(dt);
+    const hour = dt.getHours();
+    const key = `${day}|${hour}`;
+    if(!map[key]) map[key] = [];
+    map[key].push(v);
+  });
+  const days = [...new Set(rows.map(r => localDateKey(r.dt)))].sort();
+  const hours = Array.from({length:24}, (_,i) => i);
+  return {
+    days,
+    labels: days.map(shortDateLabel),
+    hours,
+    z: days.map(day => hours.map(hour => {
+      const vals = map[`${day}|${hour}`];
+      return vals?.length ? mean(vals) : null;
+    })),
+  };
+}
+
 const DIAS=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 const JS_DOW=[1,2,3,4,5,6,0]; // Mon=1...Sun=0 in JS getDay()
 function weekdayBoxplot(rows) {
@@ -908,11 +1030,102 @@ function weekdayBoxplot(rows) {
   return DIAS.map((_,i)=>map[i]);
 }
 
+function weekdayHourlyProfile(rows) {
+  const map = {};
+  for(let d=0; d<7; d++) {
+    map[d] = {};
+    for(let h=0; h<24; h++) map[d][h] = [];
+  }
+  rows.forEach(({dt,v}) => {
+    const idx = JS_DOW.indexOf(dt.getDay());
+    if(idx >= 0) map[idx][dt.getHours()].push(v);
+  });
+  const hours = Array.from({length:24}, (_,i)=>i);
+  return {
+    hours,
+    series: DIAS.map((dia, d) => ({
+      dia,
+      means: hours.map(h => map[d][h].length ? mean(map[d][h]) : null),
+    })),
+  };
+}
+
+function monthlyBoxplot(rows) {
+  const map = {};
+  rows.forEach(({dt,v}) => {
+    const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    if(!map[key]) map[key] = [];
+    map[key].push(v);
+  });
+  const keys = Object.keys(map).sort();
+  return {
+    labels: keys.map(k => {
+      const [y,m] = k.split('-');
+      return `${m}/${y.slice(2)}`;
+    }),
+    values: keys.map(k => map[k]),
+  };
+}
+
+function limitEntries(cfg) {
+  const entries = [];
+  if(cfg.alerta != null) entries.push({value:cfg.alerta, label:'Alerta', color:'#F59E0B'});
+  if(cfg.critico != null) entries.push({value:cfg.critico, label:'Crítico', color:'#EF4444'});
+  cfg.refs.forEach(ref => entries.push({value:ref.valor, label:ref.label, color:ref.cor}));
+  return entries;
+}
+
+function primaryLimit(cfg) {
+  const entries = limitEntries(cfg);
+  if(!entries.length) return null;
+  return entries[entries.length - 1];
+}
+
+function dailyExceedance(rows, cfg) {
+  const limit = primaryLimit(cfg);
+  if(!limit) return null;
+  const map = {};
+  rows.forEach(({dt,v}) => {
+    const key = localDateKey(dt);
+    if(!map[key]) map[key] = { total:0, exceed:0 };
+    map[key].total++;
+    if(v > limit.value) map[key].exceed++;
+  });
+  const keys = Object.keys(map).sort();
+  return {
+    limit,
+    labels: keys.map(shortDateLabel),
+    counts: keys.map(k => map[k].exceed),
+    percents: keys.map(k => map[k].total ? (map[k].exceed / map[k].total) * 100 : 0),
+  };
+}
+
 function computeStats(vals) {
   const n=vals.length;
   if(!n) return null;
   const s=[...vals].sort((a,b)=>a-b);
-  return { n, mean:mean(vals), median:median(vals), std:std(vals), min:s[0], max:s[s.length-1], p95:percentile(vals,95) };
+  const st = {
+    n,
+    mean:mean(vals),
+    median:median(vals),
+    std:std(vals),
+    variance:variance(vals),
+    min:s[0],
+    max:s[s.length-1],
+    p5:percentile(vals,5),
+    p10:percentile(vals,10),
+    q1:percentile(vals,25),
+    q3:percentile(vals,75),
+    p90:percentile(vals,90),
+    p95:percentile(vals,95),
+    p99:percentile(vals,99),
+    cv:coefficientOfVariation(vals),
+    skew:skewness(vals),
+    kurtosis:kurtosisExcess(vals),
+  };
+  st.iqr = st.q3 - st.q1;
+  st.range = st.max - st.min;
+  return st;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1116,9 +1329,79 @@ function exportRefShapes(cfg) {
   return {shapes, annotations};
 }
 
-function exportChartSpec(kind, rows, cfg, width=900, height=560) {
+function fmtPct(v, dec=1) {
+  return (v == null || isNaN(v)) ? '—' : `${v.toFixed(dec)}%`;
+}
+
+function fmtSigned(v, dec=2) {
+  if(v == null || isNaN(v)) return '—';
+  return `${v >= 0 ? '+' : ''}${v.toFixed(dec)}`;
+}
+
+function analysisMetricPairs(rows, cfg, totalRows=null) {
+  const vals = rows.map(r => r.v);
+  const st = computeStats(vals);
+  const pairs = [
+    ['Registros válidos', st.n.toLocaleString('pt-BR')],
+    ['Cobertura', totalRows ? fmtPct((st.n / totalRows) * 100) : '—'],
+    ['Média', fmt(st.mean)],
+    ['Mediana', fmt(st.median)],
+    ['Desvio padrão', fmt(st.std)],
+    ['Variância', fmt(st.variance)],
+    ['CV', fmtPct(st.cv)],
+    ['Mínimo', fmt(st.min)],
+    ['Máximo', fmt(st.max)],
+    ['Amplitude', fmt(st.range)],
+    ['P5', fmt(st.p5)],
+    ['P10', fmt(st.p10)],
+    ['Q1', fmt(st.q1)],
+    ['Q3', fmt(st.q3)],
+    ['IQR', fmt(st.iqr)],
+    ['P90', fmt(st.p90)],
+    ['P95', fmt(st.p95)],
+    ['P99', fmt(st.p99)],
+    ['Assimetria', fmtSigned(st.skew)],
+    ['Curtose exc.', fmtSigned(st.kurtosis)],
+  ];
+  limitEntries(cfg).forEach(limit => {
+    const count = vals.filter(v => v > limit.value).length;
+    pairs.push([`> ${limit.label}`, `${count.toLocaleString('pt-BR')} (${fmtPct((count / vals.length) * 100)})`]);
+  });
+  return pairs;
+}
+
+function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
   const vals = rows.map(r => r.v);
   const unitTitle = `${cfg.nome} (${cfg.unidade})`;
+
+  if(kind === 'summary') {
+    const pairs = analysisMetricPairs(rows, cfg, ctx?.totalRows);
+    return {
+      traces:[{
+        type:'table',
+        columnwidth:[0.42, 0.58],
+        header:{
+          values:[['<b>Métrica</b>'], ['<b>Valor</b>']],
+          fill:{color:'#E5E7EB'},
+          line:{color:'#CBD5E1'},
+          font:{color:'#111827', size:14},
+          align:['left','left'],
+          height:30,
+        },
+        cells:{
+          values:[pairs.map(p=>p[0]), pairs.map(p=>p[1])],
+          fill:{color:[pairs.map((_,i)=>i%2?'#FFFFFF':'#F8FAFC'), pairs.map((_,i)=>i%2?'#FFFFFF':'#F8FAFC')]},
+          line:{color:'#E5E7EB'},
+          font:{color:'#111827', size:13},
+          align:['left','left'],
+          height:26,
+        }
+      }],
+      layout:exportLayout(`Tabela Estatística - ${cfg.nome}`, width, height, {
+        margin:{t:58, b:28, l:28, r:28},
+      })
+    };
+  }
 
   if(kind === 'timeSeries') {
     const d = dailyStats(rows);
@@ -1132,6 +1415,23 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560) {
       layout:exportLayout(`Série Temporal - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations,
         xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', type:'date', title:{text:'Data'}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'hourlySeries') {
+    const h = hourlySeriesStats(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:[
+        { name:'Mín/Máx horário', x:[...h.dates,...[...h.dates].reverse()], y:[...h.maxs,...[...h.mins].reverse()],
+          fill:'toself', fillcolor:cfg.corClara, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
+        { name:'Média horária', x:h.dates, y:h.means, mode:'lines', line:{color:cfg.cor,width:2.4}, type:'scatter' },
+      ],
+      layout:exportLayout(`Série Horária - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', type:'date', title:{text:'Data/Hora'}},
         yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
       })
     };
@@ -1208,6 +1508,26 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560) {
     };
   }
 
+  if(kind === 'heatmap') {
+    const h = heatmapStats(rows);
+    return {
+      traces:[{
+        z:h.z,
+        x:h.hours,
+        y:h.labels,
+        type:'heatmap',
+        colorscale:[[0,'#EFF6FF'], [0.5,cfg.cor], [1,'#111827']],
+        hovertemplate:'Dia %{y}<br>Hora %{x}:00<br>Média %{z:.2f}<extra></extra>',
+        colorbar:{title:cfg.unidade},
+      }],
+      layout:exportLayout(`Mapa Dia × Hora - ${cfg.nome}`, width, height, {
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Hora do dia'}, tickvals:Array.from({length:12},(_,i)=>i*2)},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Dia'}},
+        showlegend:false,
+      })
+    };
+  }
+
   if(kind === 'qq') {
     const qq = computeQQ(vals);
     const lx=[qq.theoretical[0], qq.theoretical[qq.theoretical.length-1]];
@@ -1241,6 +1561,64 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560) {
     };
   }
 
+  if(kind === 'weekdayProfile') {
+    const profile = weekdayHourlyProfile(rows);
+    const colors = ['#2563EB','#16A34A','#F59E0B','#DC2626','#7C3AED','#0F766E','#111827'];
+    return {
+      traces:profile.series.map((serie,i)=>({
+        x:profile.hours,
+        y:serie.means,
+        mode:'lines',
+        type:'scatter',
+        name:serie.dia,
+        line:{color:colors[i], width:i < 5 ? 2 : 1.5},
+      })),
+      layout:exportLayout(`Perfil Horário por Dia da Semana - ${cfg.nome}`, width, height, {
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Hora do dia'}, tickvals:Array.from({length:12},(_,i)=>i*2)},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'monthlyBoxplot') {
+    const groups = monthlyBoxplot(rows);
+    const refs = exportRefShapes(cfg);
+    return {
+      traces:groups.labels.map((label,i)=>({y:groups.values[i], type:'box', name:label, marker:{color:cfg.cor, size:3, opacity:0.5},
+        line:{color:cfg.cor}, fillcolor:cfg.corClara, boxmean:true})),
+      layout:exportLayout(`Boxplot Mensal - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations, showlegend:false,
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF'},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      })
+    };
+  }
+
+  if(kind === 'exceedance') {
+    const ex = dailyExceedance(rows, cfg);
+    if(!ex) {
+      return {
+        traces:[],
+        layout:exportLayout(`Excedências/Limites - ${cfg.nome}`, width, height, {
+          annotations:[{x:0.5, y:0.5, xref:'paper', yref:'paper', text:'Sem limite de referência cadastrado para este parâmetro.', showarrow:false, font:{size:18, color:'#64748B'}}],
+          xaxis:{visible:false},
+          yaxis:{visible:false},
+        })
+      };
+    }
+    return {
+      traces:[
+        {x:ex.labels, y:ex.percents, type:'bar', name:`% acima de ${ex.limit.label}`, marker:{color:ex.limit.color}},
+        {x:ex.labels, y:ex.counts, type:'scatter', mode:'lines+markers', name:'N de excedências', yaxis:'y2', line:{color:'#111827', width:2}, marker:{size:5}},
+      ],
+      layout:exportLayout(`Excedências - ${cfg.nome}`, width, height, {
+        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickangle:-45, title:{text:'Dia'}},
+        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'% acima do limite'}},
+        yaxis2:{overlaying:'y', side:'right', title:{text:'N'}, gridcolor:'rgba(0,0,0,0)', linecolor:'#9CA3AF'},
+      })
+    };
+  }
+
   throw new Error(`Exportação desconhecida: ${kind}`);
 }
 
@@ -1253,6 +1631,33 @@ function fmtDate(d) {
   return `${s[2]}/${s[1]}/${s[0]}`;
 }
 
+function buildExportOptionsHtml(mode='panel') {
+  return EXPORT_OPTIONS.map(opt => {
+    const checked = mode === 'global' ? opt.key === 'complete' : opt.default;
+    return `
+      <label class="export-option">
+        <input type="checkbox" class="${mode === 'global' ? 'global-export-check' : 'export-check'}" data-export="${opt.key}" ${checked?'checked':''}/>
+        <span>${opt.label}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function buildAdvancedStatsHtml(ctx) {
+  const pairs = analysisMetricPairs(ctx.rows, ctx.cfg, ctx.totalRows);
+  const primary = [
+    'Cobertura', 'Variância', 'CV', 'Q1', 'Q3', 'IQR',
+    'P5', 'P90', 'P99', 'Assimetria', 'Curtose exc.', 'Amplitude'
+  ];
+  const extras = pairs.filter(([label]) => primary.includes(label) || label.startsWith('> '));
+  return extras.map(([label, value]) => `
+    <div class="metric-chip">
+      <div class="lbl">${label}</div>
+      <div class="val">${value}</div>
+    </div>
+  `).join('');
+}
+
 function buildPanel(col, cfg, rows) {
   const vals = rows.map(r=>r.v);
   const st   = computeStats(vals);
@@ -1263,17 +1668,15 @@ function buildPanel(col, cfg, rows) {
   const qq  = `qq-${col.replace(/\./g,'_')}`;
   const bp  = `bp-${col.replace(/\./g,'_')}`;
   const slug = col.toLowerCase().replace(/\./g,'-');
-  EXPORT_CONTEXTS[col] = { col, cfg, rows, vals, slug, chartIds:{timeSeries:ts, diurnal:dp, qq, weekdayBoxplot:bp} };
+  const ctx = { col, cfg, rows, vals, slug, totalRows:CURRENT_DATASET.totalRows, sourceLabel:CURRENT_DATASET.sourceLabel,
+    chartIds:{timeSeries:ts, diurnal:dp, qq, weekdayBoxplot:bp} };
+  EXPORT_CONTEXTS[col] = ctx;
 
   const refText = cfg.refs.length
     ? `<div class="ref-bar">⚠ Referências destacadas: ${cfg.refs.map(r=>r.label).join('  ·  ')}</div>`
     : '';
-  const exportOptions = EXPORT_OPTIONS.map(opt => `
-    <label class="export-option">
-      <input type="checkbox" class="export-check" data-export="${opt.key}" ${opt.default?'checked':''}/>
-      <span>${opt.label}</span>
-    </label>
-  `).join('');
+  const exportOptions = buildExportOptionsHtml('panel');
+  const advancedStats = buildAdvancedStatsHtml(ctx);
 
   const container = document.getElementById('panels-container');
   const div = document.createElement('div');
@@ -1288,6 +1691,7 @@ function buildPanel(col, cfg, rows) {
       <div class="pstat"><div class="lbl">Mín → Máx</div><div class="val" style="font-size:12px">${fmt(st.min)} → ${fmt(st.max)}</div></div>
       <div class="pstat"><div class="lbl">P95</div><div class="val">${fmt(st.p95)}</div></div>
     </div>
+    <div class="advanced-stats-grid">${advancedStats}</div>
     ${refText}
     <div class="export-tools">
       <div class="export-tools-head">
@@ -1295,7 +1699,10 @@ function buildPanel(col, cfg, rows) {
           <div class="export-tools-title">Exportação estatística</div>
           <span class="info-text">Selecione as imagens e baixe um pacote ZIP para ${cfg.nome}</span>
         </div>
-        <button class="btn btn-outline" type="button" onclick="exportStatsPackage('${col}')">⬇ Baixar pacote</button>
+        <div class="export-buttons">
+          <button class="btn btn-outline" type="button" onclick="downloadCompleteReport('${col}')">⬇ Imagem final</button>
+          <button class="btn btn-outline" type="button" onclick="exportStatsPackage('${col}')">⬇ Baixar pacote</button>
+        </div>
       </div>
       <div class="export-options">${exportOptions}</div>
     </div>
@@ -1377,7 +1784,51 @@ function downloadChart(divId, fileName) {
   });
 }
 
-async function exportStatsPackage(col) {
+function getSelectedExports(root) {
+  return Array.from(root.querySelectorAll('input[data-export]:checked')).map(el => el.dataset.export);
+}
+
+function selectedGlobalExports() {
+  const root = document.getElementById('global-export-options');
+  const selected = root ? getSelectedExports(root) : [];
+  return selected.length ? selected : ['complete'];
+}
+
+function downloadCurrentCompleteReport() {
+  if(!activeTab) {
+    showToast('Nenhum parâmetro ativo para exportar.');
+    return;
+  }
+  downloadCompleteReport(activeTab);
+}
+
+function exportCurrentStatsPackage() {
+  if(!activeTab) {
+    showToast('Nenhum parâmetro ativo para exportar.');
+    return;
+  }
+  exportStatsPackage(activeTab);
+}
+
+async function downloadCompleteReport(col) {
+  const ctx = EXPORT_CONTEXTS[col];
+  if(!ctx) {
+    showToast('Parâmetro não encontrado para exportação.');
+    return;
+  }
+  showLoading(`Gerando imagem final: ${ctx.cfg.nome}…`);
+  try {
+    const dataUrl = await createCompleteReportImage(ctx);
+    downloadBlob(dataUrlToBlob(dataUrl), `${ctx.slug}-relatorio-completo.png`);
+    hideLoading();
+  } catch(err) {
+    hideLoading();
+    console.error(err);
+    showToast(`Não foi possível gerar a imagem final: ${err.message}`);
+  }
+}
+
+async function exportStatsPackage(col, selectedOverride=null) {
   const ctx = EXPORT_CONTEXTS[col];
   if(!ctx) {
     showToast('Parâmetro não encontrado para exportação.');
@@ -1389,7 +1840,7 @@ async function exportStatsPackage(col) {
   }
 
   const panel = document.getElementById(`panel-${col.replace(/\./g,'_')}`);
-  const selected = Array.from(panel.querySelectorAll('.export-check:checked')).map(el => el.dataset.export);
+  const selected = selectedOverride || getSelectedExports(panel);
   if(!selected.length) {
     showToast('Selecione ao menos uma imagem para exportar.');
     return;
@@ -1417,8 +1868,44 @@ async function exportStatsPackage(col) {
   }
 }
 
+async function exportAllStatsPackage() {
+  if(!window.JSZip) {
+    showToast('Biblioteca ZIP não carregada. Verifique a conexão e recarregue a página.');
+    return;
+  }
+  const contexts = Object.values(EXPORT_CONTEXTS);
+  if(!contexts.length) {
+    showToast('Carregue uma planilha antes de exportar.');
+    return;
+  }
+  const selected = selectedGlobalExports();
+  showLoading(`Gerando pacote de ${contexts.length} parâmetros…`);
+  try {
+    const zip = new JSZip();
+    for (const ctx of contexts) {
+      const folder = zip.folder(ctx.slug);
+      for (const key of selected) {
+        const option = EXPORT_OPTIONS.find(opt => opt.key === key);
+        loadingMsg(`Gerando ${ctx.cfg.nome}: ${option?.label || key}…`);
+        const dataUrl = key === 'complete'
+          ? await createCompleteReportImage(ctx)
+          : await createExportChartImage(key, ctx);
+        folder.file(`${ctx.slug}-${key}.png`, dataUrlToBlob(dataUrl));
+      }
+    }
+    loadingMsg('Compactando pacote completo…');
+    const blob = await zip.generateAsync({type:'blob'});
+    downloadBlob(blob, 'relatorios-estatisticos-todos-parametros.zip');
+    hideLoading();
+  } catch(err) {
+    hideLoading();
+    console.error(err);
+    showToast(`Não foi possível gerar todos os relatórios: ${err.message}`);
+  }
+}
+
 async function createExportChartImage(kind, ctx, width=1300, height=820) {
-  const spec = exportChartSpec(kind, ctx.rows, ctx.cfg, width, height);
+  const spec = exportChartSpec(kind, ctx.rows, ctx.cfg, width, height, ctx);
   return renderSpecToImage(spec, width, height);
 }
 
@@ -1439,12 +1926,14 @@ async function renderSpecToImage(spec, width, height) {
 
 async function createCompleteReportImage(ctx) {
   const chartJobs = [
-    ['timeSeries', 1420, 320],
-    ['histogram', 460, 300],
-    ['dailyBoxplot', 460, 300],
-    ['diurnal', 460, 300],
-    ['dailyVariability', 920, 320],
-    ['qq', 460, 320],
+    ['timeSeries', 1620, 330],
+    ['histogram', 520, 300],
+    ['dailyBoxplot', 520, 300],
+    ['diurnal', 520, 300],
+    ['dailyVariability', 1050, 320],
+    ['qq', 520, 320],
+    ['heatmap', 790, 290],
+    ['weekdayProfile', 790, 290],
   ];
   const chartUrls = {};
   for (const [kind, width, height] of chartJobs) {
@@ -1452,8 +1941,8 @@ async function createCompleteReportImage(ctx) {
   }
 
   const canvas = document.createElement('canvas');
-  canvas.width = 1600;
-  canvas.height = 1200;
+  canvas.width = 1800;
+  canvas.height = 1600;
   const c = canvas.getContext('2d');
   c.fillStyle = '#FFFFFF';
   c.fillRect(0, 0, canvas.width, canvas.height);
@@ -1462,22 +1951,24 @@ async function createCompleteReportImage(ctx) {
   c.fillStyle = '#111827';
   c.textAlign = 'center';
   c.font = '700 26px Arial, sans-serif';
-  c.fillText(`Análise Estatística Completa - ${ctx.cfg.nome}`, 800, 34);
+  c.fillText(`Análise Estatística Completa - ${ctx.cfg.nome}`, 900, 34);
   c.font = '700 20px Arial, sans-serif';
-  c.fillText(period, 800, 60);
+  c.fillText(period, 900, 60);
 
-  drawSummaryStrip(c, ctx, 70, 82, 1460, 72);
-  await drawDataUrl(c, chartUrls.timeSeries, 90, 170, 1420, 320);
-  await drawDataUrl(c, chartUrls.histogram, 90, 525, 460, 300);
-  await drawDataUrl(c, chartUrls.dailyBoxplot, 570, 525, 460, 300);
-  await drawDataUrl(c, chartUrls.diurnal, 1050, 525, 460, 300);
-  await drawDataUrl(c, chartUrls.dailyVariability, 90, 860, 920, 320);
-  await drawDataUrl(c, chartUrls.qq, 1050, 860, 460, 320);
+  drawSummaryStrip(c, ctx, 80, 82, 1640, 72);
+  await drawDataUrl(c, chartUrls.timeSeries, 90, 170, 1620, 330);
+  await drawDataUrl(c, chartUrls.histogram, 90, 535, 520, 300);
+  await drawDataUrl(c, chartUrls.dailyBoxplot, 640, 535, 520, 300);
+  await drawDataUrl(c, chartUrls.diurnal, 1190, 535, 520, 300);
+  await drawDataUrl(c, chartUrls.dailyVariability, 90, 870, 1050, 320);
+  await drawDataUrl(c, chartUrls.qq, 1190, 870, 520, 320);
+  await drawDataUrl(c, chartUrls.heatmap, 90, 1225, 790, 290);
+  await drawDataUrl(c, chartUrls.weekdayProfile, 920, 1225, 790, 290);
 
   c.fillStyle = '#6B7280';
   c.textAlign = 'right';
   c.font = '12px Arial, sans-serif';
-  c.fillText(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 1510, 1188);
+  c.fillText(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 1710, 1588);
   return canvas.toDataURL('image/png');
 }
 
@@ -1627,6 +2118,8 @@ function renderRows(rows, sourceLabel) {
 
   loadingMsg('Calculando estatísticas…');
   const totalRows = rows.length;
+  CURRENT_DATASET = { rows, sourceLabel, totalRows };
+  Object.keys(EXPORT_CONTEXTS).forEach(key => delete EXPORT_CONTEXTS[key]);
   const allDates = rows.map(r=>r._dt);
   const dateRange = minMax(allDates);
   if(!dateRange) throw new Error('Nenhuma data válida encontrada.');
@@ -1650,6 +2143,7 @@ function renderRows(rows, sourceLabel) {
   const avgCov = mean(coverages);
   document.getElementById('stat-coverage').textContent = `${(avgCov*100).toFixed(1)}%`;
   document.getElementById('file-info').textContent = sourceLabel;
+  document.getElementById('global-export-options').innerHTML = buildExportOptionsHtml('global');
 
   document.getElementById('tabs-header').innerHTML='';
   document.getElementById('panels-container').innerHTML='';
