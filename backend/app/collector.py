@@ -28,6 +28,9 @@ class CollectorNotConfigured(RuntimeError):
 
 
 class IseqCollector:
+    def preflight(self) -> None:
+        return None
+
     def fetch_export(self, task: ExportTask, destination_dir: Path) -> Path:
         raise NotImplementedError
 
@@ -41,6 +44,9 @@ class ApiReportCollector(IseqCollector):
         self.request_timeout_seconds = int(os.getenv("ISEQ_REQUEST_TIMEOUT_SECONDS", "180"))
         self.download_timeout_seconds = int(os.getenv("ISEQ_DOWNLOAD_TIMEOUT_SECONDS", "300"))
         self.utc_offset_hours = int(os.getenv("ISEQ_LOCAL_UTC_OFFSET_HOURS", "3"))
+
+    def preflight(self) -> None:
+        self._list_reports()
 
     def fetch_export(self, task: ExportTask, destination_dir: Path) -> Path:
         report = self._safe_find_ready_report(task) or self._generate_and_wait(task)
@@ -200,7 +206,7 @@ class ApiReportCollector(IseqCollector):
                 raw = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"ISEQ API HTTP {exc.code}: {detail}") from exc
+            raise RuntimeError(f"ISEQ API HTTP {exc.code} em {endpoint}: {detail}") from exc
         except URLError as exc:
             raise RuntimeError(f"Falha de conexao com ISEQ API: {exc.reason}") from exc
         except TimeoutError as exc:

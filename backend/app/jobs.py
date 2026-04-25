@@ -15,6 +15,15 @@ from .iseq_parser import parse_iseq_xlsx, records_to_wide_rows
 
 MAX_RETRY_SECONDS = 15 * 60
 IDLE_SLEEP_SECONDS = 5
+TERMINAL_STATUSES = {"completed", "failed", "cancelled", "stale"}
+ISEQ_UNAVAILABLE_MARKERS = (
+    "HTTP 502",
+    "HTTP 503",
+    "HTTP 504",
+    "Gateway Time-out",
+    "Gateway Timeout",
+)
+ISEQ_AUTH_MARKERS = ("HTTP 401", "HTTP 403")
 
 
 @dataclass
@@ -106,6 +115,19 @@ class JobStore:
             job.updated_at = datetime.now().isoformat(timespec="seconds")
             self._save_job(job)
 
+        try:
+            self.collector.preflight()
+        except Exception as exc:
+            stop_message = self._collector_stop_message(str(exc))
+            if stop_message:
+                with self.lock:
+                    job = self.jobs[job_id]
+                    job.status = "failed"
+                    job.message = stop_message
+                    job.updated_at = datetime.now().isoformat(timespec="seconds")
+                    self._save_job(job)
+                return
+
         workers = [
             threading.Thread(target=self._run_job_worker, args=(job_id,), daemon=True)
             for _ in range(worker_count)
@@ -128,6 +150,15 @@ class JobStore:
         while True:
             with self.lock:
                 job = self.jobs[job_id]
+                if job.status in TERMINAL_STATUSES:
+                    return
+                stop_message = self._job_stop_message(job)
+                if stop_message:
+                    job.status = "failed"
+                    job.message = stop_message
+                    job.updated_at = datetime.now().isoformat(timespec="seconds")
+                    self._save_job(job)
+                    return
                 pending = self._next_runnable_task(job)
                 if pending is None:
                     if all(task.status == "completed" for task in job.tasks):
@@ -228,6 +259,42 @@ class JobStore:
     def _refresh_counts(self, job: JobState) -> None:
         job.completed_tasks = sum(1 for task in job.tasks if task.status == "completed")
         job.attempted_tasks = sum(1 for task in job.tasks if task.attempts > 0 or task.status == "completed")
+
+    def _job_stop_message(self, job: JobState) -> str | None:
+        if not job.tasks or job.completed_tasks > 0:
+            return None
+        if not all(task.attempts > 0 for task in job.tasks):
+            return None
+
+        errors = [task.last_error or "" for task in job.tasks]
+        if errors and all(self._has_marker(error, ISEQ_UNAVAILABLE_MARKERS) for error in errors):
+            return self._iseq_unavailable_message()
+        if errors and all(self._has_marker(error, ISEQ_AUTH_MARKERS) for error in errors):
+            return self._iseq_auth_message()
+        return None
+
+    def _collector_stop_message(self, error: str) -> str | None:
+        if self._has_marker(error, ISEQ_UNAVAILABLE_MARKERS):
+            return self._iseq_unavailable_message()
+        if self._has_marker(error, ISEQ_AUTH_MARKERS):
+            return self._iseq_auth_message()
+        return None
+
+    def _iseq_unavailable_message(self) -> str:
+        return (
+            "ISEQ indisponível: a API retornou erro 502/503/504 antes de gerar os relatórios. "
+            "O site da ISEQ não está entregando dados agora. Tente novamente mais tarde ou carregue os XLSX manualmente."
+        )
+
+    def _iseq_auth_message(self) -> str:
+        return (
+            "Token ISEQ recusado: a API retornou 401/403. "
+            "Abra o login automático novamente para capturar um token novo."
+        )
+
+    def _has_marker(self, text: str, markers: tuple[str, ...]) -> bool:
+        lower = text.lower()
+        return any(marker.lower() in lower for marker in markers)
 
     def _finalize_job(self, job: JobState) -> None:
         files = [task.file_path for task in job.tasks if task.file_path]
