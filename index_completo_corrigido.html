@@ -163,7 +163,8 @@
     letter-spacing: 0.6px;
     margin-bottom: 6px;
   }
-  .field input {
+  .field input,
+  .field select {
     width: 100%;
     background: #0D1117;
     border: 1px solid var(--border);
@@ -174,7 +175,8 @@
     padding: 10px 12px;
     min-height: 40px;
   }
-  .field input:focus {
+  .field input:focus,
+  .field select:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(88,166,255,0.16);
@@ -260,6 +262,187 @@
     font-size: 20px; font-weight: 700; color: var(--text);
   }
   .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .insight-dashboard {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .insight-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    min-height: 106px;
+  }
+  .insight-card .label {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .insight-card .value {
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .insight-card .sub {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+    margin-top: 8px;
+  }
+
+  .analysis-controls {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .control-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(130px, 1fr));
+    gap: 12px;
+  }
+  .field label {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .field input,
+  .field select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 10px 11px;
+  }
+  .check-row,
+  .param-filter-grid,
+  .control-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .param-filter-grid { gap: 10px; }
+  .check-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 32px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 7px 10px;
+  }
+  .check-pill input { accent-color: var(--accent); }
+  .control-actions {
+    justify-content: space-between;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .control-actions .action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .analysis-note-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+    gap: 12px;
+    margin: 0 0 18px;
+  }
+  .analysis-note,
+  .comparison-card,
+  .chart-explainer {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 14px 16px;
+  }
+  .analysis-note .title,
+  .comparison-card .title,
+  .chart-explainer .title {
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .comparison-table {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .comparison-cell {
+    background: rgba(13, 17, 23, 0.32);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .comparison-cell .lbl {
+    color: var(--muted);
+    font-size: 10px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .comparison-cell .val {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+  }
+  .chart-explainer {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .chart-explainer p { margin: 0; color: var(--muted); }
+
+  body.presentation-mode {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface2: #FFFFFF;
+    --border: #CBD5E1;
+    --text: #0F172A;
+    --muted: #475569;
+    --accent: #2563EB;
+    --accent2: #0891B2;
+  }
+  body.presentation-mode header {
+    position: static;
+    background: #FFFFFF;
+    box-shadow: none;
+  }
+  body.presentation-mode .badge,
+  body.presentation-mode .chart-download,
+  body.presentation-mode .global-export-tools,
+  body.presentation-mode .footer-actions {
+    display: none;
+  }
 
   /* ─── Tabs ──────────────────────────────────────────────── */
   .tabs-wrapper {
@@ -479,6 +662,11 @@
     .export-options { grid-template-columns: 1fr; }
     .export-buttons { width: 100%; }
     .stats-bar { grid-template-columns: repeat(2,1fr); }
+    .insight-dashboard { grid-template-columns: 1fr; }
+    .control-grid { grid-template-columns: 1fr; }
+    .control-actions { align-items: flex-start; flex-direction: column; }
+    .analysis-note-grid { grid-template-columns: 1fr; }
+    .chart-explainer { grid-template-columns: 1fr; }
     .charts-grid-bottom { grid-template-columns: 1fr; }
     .param-stats { grid-template-columns: repeat(3,1fr); }
     .advanced-stats-grid { grid-template-columns: repeat(2,1fr); }
@@ -510,7 +698,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.2</span>
+    <span class="badge">v2.3</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -549,6 +737,14 @@
           <label for="end-date">Fim</label>
           <input id="end-date" type="datetime-local" required/>
         </div>
+        <div class="field">
+          <label for="job-workers">Requisições simultâneas</label>
+          <select id="job-workers">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+          </select>
+        </div>
         <div class="iseq-actions">
           <button class="btn" type="submit">Buscar todos</button>
           <span class="info-text">CO2 · NOx · VOC · PM · Temp · Umid · Pressão</span>
@@ -584,6 +780,64 @@
         <div class="label">Cobertura</div>
         <div class="value" id="stat-coverage">—</div>
         <div class="sub">dados válidos (média)</div>
+      </div>
+    </div>
+
+    <div class="insight-dashboard" id="insight-dashboard"></div>
+
+    <div class="analysis-controls" id="analysis-controls">
+      <div class="control-grid">
+        <div class="field">
+          <label for="filter-start">Inicio</label>
+          <input id="filter-start" type="datetime-local" step="1"/>
+        </div>
+        <div class="field">
+          <label for="filter-end">Fim</label>
+          <input id="filter-end" type="datetime-local" step="1"/>
+        </div>
+        <div class="field">
+          <label for="hour-start">Hora inicial</label>
+          <select id="hour-start"></select>
+        </div>
+        <div class="field">
+          <label for="hour-end">Hora final</label>
+          <select id="hour-end"></select>
+        </div>
+        <div class="field">
+          <label for="stat-base">Base estatistica</label>
+          <select id="stat-base">
+            <option value="instant">Leituras instantaneas</option>
+            <option value="daily">Medias diarias</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="outlier-mode">Outliers</label>
+          <select id="outlier-mode">
+            <option value="none">Manter todos</option>
+            <option value="iqr">Remover por IQR</option>
+            <option value="p1p99">Remover P1-P99</option>
+            <option value="p5p95">Remover P5-P95</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="comparison-mode">Comparacao</label>
+          <select id="comparison-mode">
+            <option value="none">Sem comparacao</option>
+            <option value="halves">Primeira vs segunda metade</option>
+            <option value="weekday-weekend">Dias uteis vs fim de semana</option>
+          </select>
+        </div>
+      </div>
+      <div class="check-row" id="weekday-filters"></div>
+      <div class="param-filter-grid" id="param-filters"></div>
+      <div class="control-actions">
+        <label class="check-pill"><input type="checkbox" id="presentation-mode"/> Modo defesa</label>
+        <label class="check-pill"><input type="checkbox" id="graph-notes" checked/> Explicar graficos</label>
+        <div class="action-group">
+          <button class="btn btn-outline" type="button" onclick="resetAnalysisFilters()">Resetar filtros</button>
+          <button class="btn btn-outline" type="button" onclick="downloadNormalizedCsv()">Baixar CSV</button>
+          <button class="btn btn-outline" type="button" onclick="downloadNormalizedXlsx()">Baixar XLSX</button>
+        </div>
       </div>
     </div>
 
@@ -676,6 +930,10 @@ const EXPORT_OPTIONS = [
 ];
 const EXPORT_CONTEXTS = {};
 let CURRENT_DATASET = { rows: [], sourceLabel: '', totalRows: 0 };
+let CURRENT_VIEW_ROWS = [];
+let CURRENT_AVAILABLE_PARAMS = [];
+let ANALYSIS_CONTROLS_WIRED = false;
+const WEEKDAY_FILTER_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
 function finiteVals(arr) {
   return arr.filter(v => Number.isFinite(v));
@@ -744,39 +1002,60 @@ function kurtosisExcess(arr) {
   return mean(arr.map(v => ((v - m) / s) ** 4)) - 3;
 }
 
-// Normal quantile (probit) — Beasley-Springer-Moro approximation
+// Normal quantile (probit) — Peter J. Acklam approximation
 function normPPF(p) {
   if(p<=0) return -Infinity; if(p>=1) return Infinity;
-  const a=[2.50662823884,-18.61500062529,41.39119773534,-25.44106049637];
-  const b=[-8.47351093090,23.08336743743,-21.06224101826,3.13082909833];
-  const c=[0.3374754822726147,0.9761690190917186,0.1607979714918209,0.0276438810333863,
-           0.0038405729373609,0.0003951896511349,0.0000321767881768,0.0000002888167364,0.0000003960315187];
-  const q=p-0.5;
-  if(Math.abs(q)<0.42) {
-    const r=q*q;
-    return q*(((a[3]*r+a[2])*r+a[1])*r+a[0])/((((b[3]*r+b[2])*r+b[1])*r+b[0])*r+1);
+  const a=[
+    -39.69683028665376, 220.9460984245205, -275.9285104469687,
+    138.3577518672690, -30.66479806614716, 2.506628277459239
+  ];
+  const b=[
+    -54.47609879822406, 161.5858368580409, -155.6989798598866,
+    66.80131188771972, -13.28068155288572
+  ];
+  const c=[
+    -0.007784894002430293, -0.3223964580411365, -2.400758277161838,
+    -2.549732539343734, 4.374664141464968, 2.938163982698783
+  ];
+  const d=[
+    0.007784695709041462, 0.3224671290700398,
+    2.445134137142996, 3.754408661907416
+  ];
+  const plow = 0.02425;
+  const phigh = 1 - plow;
+  if(p < plow) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+           ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
   }
-  let r=(q<0)?p:(1-p);
-  r=Math.log(-Math.log(r));
-  let y=c[0];
-  for(let i=1;i<9;i++) y=y*r+c[i];
-  return (q<0)?-y:y;
+  if(p > phigh) {
+    const q = Math.sqrt(-2 * Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+            ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  const q = p - 0.5;
+  const r = q * q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5]) * q /
+         (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
 }
 
 function computeQQ(vals) {
   const n = vals.length;
   const sorted = [...vals].sort((a,b)=>a-b);
+  if(n < 2) {
+    return { theoretical:[0], observed:sorted, slope:0, intercept:sorted[0] || 0, r2:1 };
+  }
   const theoretical = sorted.map((_,i) => normPPF((i+1-0.375)/(n+0.25)));
   // Linear regression
   const tx = theoretical, ty = sorted;
   const mx=mean(tx), my=mean(ty);
   const num=tx.reduce((s,x,i)=>s+(x-mx)*(ty[i]-my),0);
   const den=tx.reduce((s,x)=>s+(x-mx)**2,0);
-  const slope=num/den, intercept=my-slope*mx;
+  const slope=den ? num/den : 0, intercept=my-slope*mx;
   const fitted=tx.map(x=>slope*x+intercept);
   const ssres=ty.reduce((s,y,i)=>s+(y-fitted[i])**2,0);
   const sstot=ty.reduce((s,y)=>s+(y-my)**2,0);
-  const r2=1-ssres/sstot;
+  const r2=sstot === 0 ? 1 : 1-ssres/sstot;
   return { theoretical, observed:sorted, slope, intercept, r2 };
 }
 
@@ -1131,6 +1410,560 @@ function computeStats(vals) {
 // ═══════════════════════════════════════════════════════════
 // CORES & SHAPES PARA LINHAS DE REFERÊNCIA
 // ═══════════════════════════════════════════════════════════
+function formatDateTimeInput(dt) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+}
+
+function parseDateTimeInput(value) {
+  if(!value) return null;
+  return parseLocalDate(value.length === 16 ? `${value}:00` : value);
+}
+
+function fmtDateTime(dt) {
+  if(!dt) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${fmtDate(dt)} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+}
+
+function fillHourSelects() {
+  ['hour-start', 'hour-end'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el || el.options.length) return;
+    el.innerHTML = Array.from({length:24}, (_,h) =>
+      `<option value="${h}">${String(h).padStart(2,'0')}:00</option>`
+    ).join('');
+  });
+}
+
+function setupAnalysisControls(rows, dMin, dMax, availParams) {
+  CURRENT_AVAILABLE_PARAMS = availParams;
+  fillHourSelects();
+
+  const start = document.getElementById('filter-start');
+  const end = document.getElementById('filter-end');
+  if(start && end) {
+    start.min = formatDateTimeInput(dMin);
+    start.max = formatDateTimeInput(dMax);
+    start.value = formatDateTimeInput(dMin);
+    end.min = formatDateTimeInput(dMin);
+    end.max = formatDateTimeInput(dMax);
+    end.value = formatDateTimeInput(dMax);
+  }
+  const hourStart = document.getElementById('hour-start');
+  const hourEnd = document.getElementById('hour-end');
+  if(hourStart) hourStart.value = '0';
+  if(hourEnd) hourEnd.value = '23';
+  const statBase = document.getElementById('stat-base');
+  const outlierMode = document.getElementById('outlier-mode');
+  const comparisonMode = document.getElementById('comparison-mode');
+  const graphNotes = document.getElementById('graph-notes');
+  const presentation = document.getElementById('presentation-mode');
+  if(statBase) statBase.value = 'instant';
+  if(outlierMode) outlierMode.value = 'none';
+  if(comparisonMode) comparisonMode.value = 'none';
+  if(graphNotes) graphNotes.checked = true;
+  if(presentation) presentation.checked = false;
+  document.body.classList.remove('presentation-mode');
+
+  const weekdays = document.getElementById('weekday-filters');
+  if(weekdays) {
+    weekdays.innerHTML = WEEKDAY_FILTER_LABELS.map((label, day) => `
+      <label class="check-pill">
+        <input type="checkbox" class="weekday-filter" value="${day}" checked/>
+        ${label}
+      </label>
+    `).join('');
+  }
+
+  const params = document.getElementById('param-filters');
+  if(params) {
+    params.innerHTML = availParams.map(([col, cfg]) => `
+      <label class="check-pill">
+        <input type="checkbox" class="param-filter" value="${col}" checked/>
+        <span class="tab-dot" style="background:${cfg.cor}"></span>${cfg.nome}
+      </label>
+    `).join('');
+  }
+  wireAnalysisControls();
+}
+
+function wireAnalysisControls() {
+  if(ANALYSIS_CONTROLS_WIRED) return;
+  ANALYSIS_CONTROLS_WIRED = true;
+  const controls = document.getElementById('analysis-controls');
+  if(!controls) return;
+  controls.addEventListener('change', event => {
+    if(event.target?.id === 'presentation-mode') {
+      document.body.classList.toggle('presentation-mode', event.target.checked);
+      setTimeout(resizeActivePanelCharts, 160);
+      return;
+    }
+    renderCurrentView({preserveTab:true});
+  });
+  controls.addEventListener('input', event => {
+    if(['filter-start', 'filter-end'].includes(event.target?.id)) {
+      renderCurrentView({preserveTab:true});
+    }
+  });
+}
+
+function resetAnalysisFilters() {
+  if(!CURRENT_DATASET.rows.length) return;
+  const range = minMax(CURRENT_DATASET.rows.map(r => r._dt));
+  if(!range) return;
+  setupAnalysisControls(CURRENT_DATASET.rows, new Date(range.min), new Date(range.max), CURRENT_AVAILABLE_PARAMS);
+  renderCurrentView({preserveTab:false});
+}
+
+function readAnalysisSettings() {
+  const weekdays = new Set(
+    Array.from(document.querySelectorAll('.weekday-filter:checked')).map(el => Number(el.value))
+  );
+  const selectedParams = new Set(
+    Array.from(document.querySelectorAll('.param-filter:checked')).map(el => el.value)
+  );
+  return {
+    start: parseDateTimeInput(document.getElementById('filter-start')?.value || ''),
+    end: parseDateTimeInput(document.getElementById('filter-end')?.value || ''),
+    hourStart: Number(document.getElementById('hour-start')?.value ?? 0),
+    hourEnd: Number(document.getElementById('hour-end')?.value ?? 23),
+    statBase: document.getElementById('stat-base')?.value || 'instant',
+    outlierMode: document.getElementById('outlier-mode')?.value || 'none',
+    comparisonMode: document.getElementById('comparison-mode')?.value || 'none',
+    showGraphNotes: document.getElementById('graph-notes')?.checked !== false,
+    weekdays,
+    selectedParams,
+  };
+}
+
+function applyDatasetFilters(rows) {
+  const settings = readAnalysisSettings();
+  return rows.filter(row => {
+    const dt = row._dt;
+    if(!(dt instanceof Date) || isNaN(dt)) return false;
+    if(settings.start && dt < settings.start) return false;
+    if(settings.end && dt > settings.end) return false;
+    const hour = dt.getHours();
+    const inHour = settings.hourStart <= settings.hourEnd
+      ? hour >= settings.hourStart && hour <= settings.hourEnd
+      : hour >= settings.hourStart || hour <= settings.hourEnd;
+    if(!inHour) return false;
+    if(settings.weekdays.size && !settings.weekdays.has(dt.getDay())) return false;
+    return true;
+  });
+}
+
+function paramValueIsValid(value, cfg) {
+  const v = parseFloat(value);
+  return Number.isFinite(v)
+    && (cfg.vmin === null || v >= cfg.vmin)
+    && (cfg.vmax === null || v <= cfg.vmax);
+}
+
+function selectedAvailableParams(rows) {
+  const settings = readAnalysisSettings();
+  return CURRENT_AVAILABLE_PARAMS
+    .filter(([col]) => !settings.selectedParams.size || settings.selectedParams.has(col))
+    .filter(([col, cfg]) => rows.some(row => paramValueIsValid(row[col], cfg)));
+}
+
+function removeOutliers(rows, mode) {
+  const vals = rows.map(r => r.v);
+  if(mode === 'none' || vals.length < 4) {
+    return { rows, removed:0, lower:null, upper:null, mode };
+  }
+  let lower = null;
+  let upper = null;
+  if(mode === 'iqr') {
+    const q1 = percentile(vals, 25);
+    const q3 = percentile(vals, 75);
+    const iqr = q3 - q1;
+    lower = q1 - 1.5 * iqr;
+    upper = q3 + 1.5 * iqr;
+  } else if(mode === 'p1p99') {
+    lower = percentile(vals, 1);
+    upper = percentile(vals, 99);
+  } else if(mode === 'p5p95') {
+    lower = percentile(vals, 5);
+    upper = percentile(vals, 95);
+  }
+  if(lower == null || upper == null || !Number.isFinite(lower) || !Number.isFinite(upper)) {
+    return { rows, removed:0, lower:null, upper:null, mode };
+  }
+  const kept = rows.filter(r => r.v >= lower && r.v <= upper);
+  return { rows: kept, removed: rows.length - kept.length, lower, upper, mode };
+}
+
+function dailyMeanRows(rows) {
+  const map = {};
+  rows.forEach(({dt, v}) => {
+    const key = localDateKey(dt);
+    if(!map[key]) map[key] = [];
+    map[key].push(v);
+  });
+  return Object.keys(map).sort().map(key => ({
+    dt: new Date(`${key}T12:00:00`),
+    v: mean(map[key]),
+    n: map[key].length,
+    day:key,
+  }));
+}
+
+function analysisRowsForParam(rows) {
+  const settings = readAnalysisSettings();
+  const outlier = removeOutliers(rows, settings.outlierMode);
+  const analysisRows = settings.statBase === 'daily'
+    ? dailyMeanRows(outlier.rows)
+    : outlier.rows;
+  return { cleanRows: outlier.rows, analysisRows, outlier };
+}
+
+function pearson(xs, ys) {
+  if(xs.length < 3 || ys.length < 3 || xs.length !== ys.length) return null;
+  const mx = mean(xs);
+  const my = mean(ys);
+  const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+  const denX = Math.sqrt(xs.reduce((s, x) => s + (x - mx) ** 2, 0));
+  const denY = Math.sqrt(ys.reduce((s, y) => s + (y - my) ** 2, 0));
+  return denX && denY ? num / (denX * denY) : null;
+}
+
+function correlationForRows(rows, a, b) {
+  const cfgA = PARAMS[a];
+  const cfgB = PARAMS[b];
+  if(!cfgA || !cfgB) return null;
+  const xs = [];
+  const ys = [];
+  rows.forEach(row => {
+    if(!paramValueIsValid(row[a], cfgA) || !paramValueIsValid(row[b], cfgB)) return;
+    xs.push(parseFloat(row[a]));
+    ys.push(parseFloat(row[b]));
+  });
+  const r = pearson(xs, ys);
+  return r == null ? null : { a, b, r, n:xs.length };
+}
+
+function correlationSummaries(rows, params) {
+  const selected = new Set(params.map(([col]) => col));
+  const pairs = [['CO2','VOC'], ['PM2.5','PM10'], ['Temp','Umid']];
+  return pairs
+    .filter(([a,b]) => selected.has(a) && selected.has(b))
+    .map(([a,b]) => correlationForRows(rows, a, b))
+    .filter(Boolean)
+    .sort((x, y) => Math.abs(y.r) - Math.abs(x.r));
+}
+
+function buildInsightCard(label, value, sub='') {
+  return `
+    <div class="insight-card">
+      <div class="label">${label}</div>
+      <div class="value">${value}</div>
+      <div class="sub">${sub}</div>
+    </div>
+  `;
+}
+
+function buildInsightDashboard(rows, params) {
+  const root = document.getElementById('insight-dashboard');
+  if(!root) return;
+  if(!rows.length) {
+    root.innerHTML = buildInsightCard('Filtros', 'Sem dados', 'Ajuste periodo, horas ou dias selecionados.');
+    return;
+  }
+
+  const range = minMax(rows.map(r => r._dt));
+  const dMin = range ? new Date(range.min) : null;
+  const dMax = range ? new Date(range.max) : null;
+  const period = dMin && dMax ? `${fmtDate(dMin)} - ${fmtDate(dMax)}` : '-';
+  const coverage = params.length
+    ? mean(params.map(([col, cfg]) => filterParam(rows, col, cfg).length / rows.length))
+    : 0;
+
+  let peak = null;
+  params.forEach(([col, cfg]) => {
+    const pRows = filterParam(rows, col, cfg);
+    if(!pRows.length) return;
+    const maxRow = pRows.reduce((best, row) => row.v > best.v ? row : best, pRows[0]);
+    const limit = primaryLimit(cfg);
+    const score = limit ? maxRow.v / limit.value : maxRow.v;
+    if(!peak || score > peak.score) peak = { col, cfg, row:maxRow, score };
+  });
+
+  let alertText = 'Sem limites excedidos';
+  let alertSub = 'Os parametros selecionados nao cruzaram referencias configuradas.';
+  const alerts = [];
+  params.forEach(([col, cfg]) => {
+    const limit = primaryLimit(cfg);
+    if(!limit) return;
+    const pRows = filterParam(rows, col, cfg);
+    if(['PM2.5', 'PM10'].includes(col)) {
+      const daily = dailyMeanRows(pRows);
+      const exceed = daily.filter(r => r.v > limit.value);
+      if(exceed.length) alerts.push({ col, cfg, count:exceed.length, max:Math.max(...daily.map(r => r.v)), limit });
+    } else {
+      const exceed = pRows.filter(r => r.v > limit.value);
+      if(exceed.length) alerts.push({ col, cfg, count:exceed.length, max:Math.max(...pRows.map(r => r.v)), limit });
+    }
+  });
+  if(alerts.length) {
+    alerts.sort((a,b) => (b.max / b.limit.value) - (a.max / a.limit.value));
+    const a = alerts[0];
+    alertText = `${a.cfg.nome}: ${fmt(a.max)} ${a.cfg.unidade}`;
+    alertSub = ['PM2.5', 'PM10'].includes(a.col)
+      ? `${a.count} dia(s) acima de ${a.limit.label}`
+      : `${a.count.toLocaleString('pt-BR')} leitura(s) acima de ${a.limit.label}`;
+  }
+
+  const corr = correlationSummaries(rows, params)[0];
+  const corrText = corr
+    ? `${PARAMS[corr.a].nome} x ${PARAMS[corr.b].nome}: ${fmtSigned(corr.r, 2)}`
+    : 'Sem pares suficientes';
+  const corrSub = corr
+    ? `${corr.n.toLocaleString('pt-BR')} pares pareados no filtro atual`
+    : 'Carregue pares como CO2/VOC, PM2.5/PM10 ou Temp/Umid.';
+
+  root.innerHTML = [
+    buildInsightCard('Periodo filtrado', period, `${rows.length.toLocaleString('pt-BR')} registros brutos no recorte`),
+    buildInsightCard('Cobertura media', `${(coverage * 100).toFixed(1)}%`, `${params.length} parametro(s) selecionado(s)`),
+    buildInsightCard('Principal pico', peak ? `${peak.cfg.nome}: ${fmt(peak.row.v)} ${peak.cfg.unidade}` : 'Sem pico', peak ? fmtDateTime(peak.row.dt) : 'Sem leituras validas'),
+    buildInsightCard('Alertas e correlacao', alertText, `${alertSub}<br>${corrText} (${corrSub})`),
+  ].join('');
+}
+
+function automaticSummaryHtml(col, cfg, analysisRows, instantRows, outlierInfo) {
+  const vals = analysisRows.map(r => r.v);
+  const st = computeStats(vals);
+  if(!st) return `<div class="title">Resumo automatico</div><p>Sem dados suficientes no recorte atual.</p>`;
+  const settings = readAnalysisSettings();
+  const peak = instantRows.length
+    ? instantRows.reduce((best, row) => row.v > best.v ? row : best, instantRows[0])
+    : analysisRows.reduce((best, row) => row.v > best.v ? row : best, analysisRows[0]);
+  const hourly = hourlyStats(instantRows.length ? instantRows : analysisRows);
+  const validHours = hourly.hours
+    .map((hour, i) => ({hour, value:hourly.means[i]}))
+    .filter(item => Number.isFinite(item.value));
+  const peakHour = validHours.length
+    ? validHours.reduce((best, item) => item.value > best.value ? item : best, validHours[0])
+    : null;
+  const limit = primaryLimit(cfg);
+  const exceed = limit ? vals.filter(v => v > limit.value).length : 0;
+  const baseLabel = settings.statBase === 'daily' ? 'medias diarias' : 'leituras instantaneas';
+  const outlierText = outlierInfo?.removed
+    ? ` Foram removidos ${outlierInfo.removed.toLocaleString('pt-BR')} outlier(s) pelo criterio selecionado.`
+    : '';
+  const limitText = limit
+    ? ` ${exceed.toLocaleString('pt-BR')} valor(es) ficaram acima de ${limit.label}.`
+    : '';
+  const hourText = peakHour
+    ? ` A maior media horaria aparece em torno de ${String(peakHour.hour).padStart(2,'0')}h.`
+    : '';
+  return `
+    <div class="title">Resumo automatico</div>
+    <p>${cfg.nome} foi analisado com ${baseLabel}: mediana ${fmt(st.median)} ${cfg.unidade}, media ${fmt(st.mean)} ${cfg.unidade} e pico ${fmt(peak.v)} ${cfg.unidade} em ${fmtDateTime(peak.dt)}.${hourText}${limitText}${outlierText}</p>
+  `;
+}
+
+function buildComparisonHtml(rows, cfg) {
+  const settings = readAnalysisSettings();
+  if(settings.comparisonMode === 'none') {
+    return `
+      <div class="comparison-card">
+        <div class="title">Comparacao entre periodos</div>
+        <p>Selecione um modo de comparacao para ver antes/depois ou dias uteis vs fim de semana.</p>
+      </div>
+    `;
+  }
+
+  let a = [];
+  let b = [];
+  let labelA = 'Grupo A';
+  let labelB = 'Grupo B';
+  const sorted = [...rows].sort((x,y) => x.dt - y.dt);
+  if(settings.comparisonMode === 'halves') {
+    const mid = Math.ceil(sorted.length / 2);
+    a = sorted.slice(0, mid);
+    b = sorted.slice(mid);
+    labelA = 'Primeira metade';
+    labelB = 'Segunda metade';
+  } else if(settings.comparisonMode === 'weekday-weekend') {
+    a = sorted.filter(r => ![0,6].includes(r.dt.getDay()));
+    b = sorted.filter(r => [0,6].includes(r.dt.getDay()));
+    labelA = 'Dias uteis';
+    labelB = 'Fim de semana';
+  }
+
+  const stA = computeStats(a.map(r => r.v));
+  const stB = computeStats(b.map(r => r.v));
+  if(!stA || !stB) {
+    return `
+      <div class="comparison-card">
+        <div class="title">Comparacao entre periodos</div>
+        <p>O recorte atual nao tem dados suficientes nos dois grupos.</p>
+      </div>
+    `;
+  }
+  const delta = stB.mean - stA.mean;
+  const pct = stA.mean ? (delta / stA.mean) * 100 : null;
+  return `
+    <div class="comparison-card">
+      <div class="title">Comparacao entre periodos</div>
+      <div class="comparison-table">
+        <div class="comparison-cell">
+          <div class="lbl">${labelA}</div>
+          <div class="val">${fmt(stA.mean)} ${cfg.unidade}</div>
+          <div class="sub">${stA.n.toLocaleString('pt-BR')} valores</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">${labelB}</div>
+          <div class="val">${fmt(stB.mean)} ${cfg.unidade}</div>
+          <div class="sub">${stB.n.toLocaleString('pt-BR')} valores</div>
+        </div>
+      </div>
+      <p>Variacao media: ${fmtSigned(delta)} ${cfg.unidade}${pct == null ? '' : ` (${fmtSigned(pct, 1)}%)`}.</p>
+    </div>
+  `;
+}
+
+function buildGraphExplainerHtml(analysisRows, instantRows, cfg) {
+  const settings = readAnalysisSettings();
+  if(!settings.showGraphNotes) return '';
+  const vals = analysisRows.map(r => r.v);
+  const qq = computeQQ(vals);
+  const hourly = hourlyStats(instantRows.length ? instantRows : analysisRows);
+  const bestHour = hourly.hours
+    .map((hour, i) => ({hour, value:hourly.means[i]}))
+    .filter(item => Number.isFinite(item.value))
+    .sort((a,b) => b.value - a.value)[0];
+  const boxText = settings.statBase === 'daily'
+    ? 'O boxplot semanal usa as medias diarias quando esta base esta ativa.'
+    : 'O boxplot resume a dispersao das leituras por dia da semana.';
+  return `
+    <div class="chart-explainer">
+      <div>
+        <div class="title">Q-Q plot</div>
+        <p>Quanto mais os pontos seguem a linha, mais a distribuicao se aproxima da normal. Neste recorte, R2 = ${fmt(qq.r2, 3)}.</p>
+      </div>
+      <div>
+        <div class="title">Boxplot</div>
+        <p>${boxText} Caixas mais altas indicam maior variabilidade.</p>
+      </div>
+      <div>
+        <div class="title">Perfil diurno</div>
+        <p>${bestHour ? `A media mais alta aparece perto de ${String(bestHour.hour).padStart(2,'0')}h.` : 'Nao ha horas suficientes para destacar um pico diurno.'}</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderCurrentView(options={}) {
+  if(!CURRENT_DATASET.rows.length) return;
+  const previousActive = options.preserveTab ? activeTab : null;
+  Object.keys(EXPORT_CONTEXTS).forEach(key => delete EXPORT_CONTEXTS[key]);
+
+  const rows = applyDatasetFilters(CURRENT_DATASET.rows);
+  CURRENT_VIEW_ROWS = rows;
+  const params = selectedAvailableParams(rows);
+  buildInsightDashboard(rows, params);
+
+  const range = minMax(rows.map(r => r._dt));
+  if(range) {
+    const dMin = new Date(range.min);
+    const dMax = new Date(range.max);
+    const nDays = Math.round((dMax - dMin) / 864e5) + 1;
+    document.getElementById('stat-period').textContent = `${fmtDate(dMin)} - ${fmtDate(dMax)}`;
+    document.getElementById('stat-days').textContent = `${nDays} dias no filtro`;
+  } else {
+    document.getElementById('stat-period').textContent = '-';
+    document.getElementById('stat-days').textContent = 'sem dados no filtro';
+  }
+  document.getElementById('stat-rows').textContent = rows.length.toLocaleString('pt-BR');
+  document.getElementById('stat-params').textContent = params.length;
+  const coverages = params.map(([k,cfg]) => rows.length ? filterParam(rows, k, cfg).length / rows.length : 0);
+  document.getElementById('stat-coverage').textContent = `${(mean(coverages) * 100 || 0).toFixed(1)}%`;
+  document.getElementById('file-info').textContent = `${CURRENT_DATASET.sourceLabel} | ${rows.length.toLocaleString('pt-BR')} registros no filtro`;
+  document.getElementById('global-export-options').innerHTML = buildExportOptionsHtml('global');
+
+  const tabsHeader = document.getElementById('tabs-header');
+  const container = document.getElementById('panels-container');
+  tabsHeader.innerHTML = '';
+  container.innerHTML = '';
+
+  let firstCol = null;
+  params.forEach(([col, cfg]) => {
+    const rawRows = filterParam(rows, col, cfg);
+    if(!rawRows.length) return;
+    const analysis = analysisRowsForParam(rawRows);
+    if(!analysis.analysisRows.length) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.dataset.col = col;
+    btn.innerHTML = `<span class="tab-dot" style="background:${cfg.cor}"></span>${cfg.nome}`;
+    btn.onclick = () => switchTab(col);
+    tabsHeader.appendChild(btn);
+
+    buildPanel(col, cfg, analysis.cleanRows, analysis.analysisRows, analysis.outlier, rows.length);
+    if(!firstCol) firstCol = col;
+  });
+
+  const target = params.some(([col]) => col === previousActive) ? previousActive : firstCol;
+  activeTab = null;
+  if(target) {
+    switchTab(target);
+  } else {
+    container.innerHTML = `<div class="panel active"><div class="analysis-note">Nenhum parametro com dados validos no filtro atual.</div></div>`;
+  }
+  setTimeout(resizeActivePanelCharts, 180);
+}
+
+function normalizedExportRows() {
+  const rows = CURRENT_VIEW_ROWS.length || !CURRENT_DATASET.rows.length
+    ? CURRENT_VIEW_ROWS
+    : applyDatasetFilters(CURRENT_DATASET.rows);
+  const params = selectedAvailableParams(rows).map(([col]) => col);
+  return rows.map(row => {
+    const out = { data_local: localIso(row._dt) };
+    params.forEach(col => {
+      const cfg = PARAMS[col];
+      out[col] = paramValueIsValid(row[col], cfg) ? parseFloat(row[col]) : null;
+    });
+    return out;
+  });
+}
+
+function csvEscape(value) {
+  if(value == null) return '';
+  const text = String(value);
+  return /[;"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadNormalizedCsv() {
+  const rows = normalizedExportRows();
+  if(!rows.length) {
+    showToast('Nao ha dados normalizados para baixar.');
+    return;
+  }
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(';'),
+    ...rows.map(row => headers.map(h => csvEscape(row[h])).join(';'))
+  ].join('\r\n');
+  downloadBlob(new Blob([csv], {type:'text/csv;charset=utf-8'}), 'dados-normalizados-filtrados.csv');
+}
+
+function downloadNormalizedXlsx() {
+  const rows = normalizedExportRows();
+  if(!rows.length) {
+    showToast('Nao ha dados normalizados para baixar.');
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dados normalizados');
+  XLSX.writeFile(wb, 'dados-normalizados-filtrados.xlsx');
+}
+
 function refShapes(cfg, yref='y') {
   const shapes=[], annotations=[];
   if(cfg.alerta!=null) {
@@ -1371,11 +2204,12 @@ function analysisMetricPairs(rows, cfg, totalRows=null) {
 }
 
 function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
-  const vals = rows.map(r => r.v);
+  const analysisRows = ctx?.analysisRows || rows;
+  const vals = analysisRows.map(r => r.v);
   const unitTitle = `${cfg.nome} (${cfg.unidade})`;
 
   if(kind === 'summary') {
-    const pairs = analysisMetricPairs(rows, cfg, ctx?.totalRows);
+    const pairs = analysisMetricPairs(analysisRows, cfg, ctx?.totalRows);
     return {
       traces:[{
         type:'table',
@@ -1627,8 +2461,8 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
 // ═══════════════════════════════════════════════════════════
 function fmt(v, dec=1) { return (v==null||isNaN(v))?'—':v.toFixed(dec); }
 function fmtDate(d) {
-  const s=d.toISOString().slice(0,10).split('-');
-  return `${s[2]}/${s[1]}/${s[0]}`;
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
 }
 
 function buildExportOptionsHtml(mode='panel') {
@@ -1644,7 +2478,7 @@ function buildExportOptionsHtml(mode='panel') {
 }
 
 function buildAdvancedStatsHtml(ctx) {
-  const pairs = analysisMetricPairs(ctx.rows, ctx.cfg, ctx.totalRows);
+  const pairs = analysisMetricPairs(ctx.analysisRows || ctx.rows, ctx.cfg, ctx.totalRows);
   const primary = [
     'Cobertura', 'Variância', 'CV', 'Q1', 'Q3', 'IQR',
     'P5', 'P90', 'P99', 'Assimetria', 'Curtose exc.', 'Amplitude'
@@ -1658,8 +2492,8 @@ function buildAdvancedStatsHtml(ctx) {
   `).join('');
 }
 
-function buildPanel(col, cfg, rows) {
-  const vals = rows.map(r=>r.v);
+function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRows=CURRENT_DATASET.totalRows) {
+  const vals = analysisRows.map(r=>r.v);
   const st   = computeStats(vals);
 
   const panelId = `panel-${col.replace(/\./g,'_')}`;
@@ -1668,15 +2502,18 @@ function buildPanel(col, cfg, rows) {
   const qq  = `qq-${col.replace(/\./g,'_')}`;
   const bp  = `bp-${col.replace(/\./g,'_')}`;
   const slug = col.toLowerCase().replace(/\./g,'-');
-  const ctx = { col, cfg, rows, vals, slug, totalRows:CURRENT_DATASET.totalRows, sourceLabel:CURRENT_DATASET.sourceLabel,
+  const ctx = { col, cfg, rows, analysisRows, vals, slug, totalRows, sourceLabel:CURRENT_DATASET.sourceLabel,
+    outlierInfo, statBase:readAnalysisSettings().statBase,
     chartIds:{timeSeries:ts, diurnal:dp, qq, weekdayBoxplot:bp} };
   EXPORT_CONTEXTS[col] = ctx;
 
   const refText = cfg.refs.length
     ? `<div class="ref-bar">⚠ Referências destacadas: ${cfg.refs.map(r=>r.label).join('  ·  ')}</div>`
     : '';
-  const exportOptions = buildExportOptionsHtml('panel');
   const advancedStats = buildAdvancedStatsHtml(ctx);
+  const summaryHtml = automaticSummaryHtml(col, cfg, analysisRows, rows, outlierInfo);
+  const comparisonHtml = buildComparisonHtml(analysisRows, cfg);
+  const explainerHtml = buildGraphExplainerHtml(analysisRows, rows, cfg);
 
   const container = document.getElementById('panels-container');
   const div = document.createElement('div');
@@ -1693,18 +2530,9 @@ function buildPanel(col, cfg, rows) {
     </div>
     <div class="advanced-stats-grid">${advancedStats}</div>
     ${refText}
-    <div class="export-tools">
-      <div class="export-tools-head">
-        <div>
-          <div class="export-tools-title">Exportação estatística</div>
-          <span class="info-text">Selecione as imagens e baixe um pacote ZIP para ${cfg.nome}</span>
-        </div>
-        <div class="export-buttons">
-          <button class="btn btn-outline" type="button" onclick="downloadCompleteReport('${col}')">⬇ Imagem final</button>
-          <button class="btn btn-outline" type="button" onclick="exportStatsPackage('${col}')">⬇ Baixar pacote</button>
-        </div>
-      </div>
-      <div class="export-options">${exportOptions}</div>
+    <div class="analysis-note-grid">
+      <div class="analysis-note">${summaryHtml}</div>
+      ${comparisonHtml}
     </div>
     <div class="chart-card charts-grid-top">
       <div class="chart-topbar">
@@ -1736,6 +2564,7 @@ function buildPanel(col, cfg, rows) {
         <div id="${bp}"></div>
       </div>
     </div>
+    ${explainerHtml}
   `;
   container.appendChild(div);
 
@@ -1743,7 +2572,7 @@ function buildPanel(col, cfg, rows) {
     buildTimeSeries(ts, rows, cfg);
     buildDiurnal(dp, rows, cfg);
     buildQQ(qq, vals, cfg);
-    buildBoxplot(bp, rows, cfg);
+    buildBoxplot(bp, analysisRows, cfg);
   });
 
   return panelId;
@@ -1973,7 +2802,7 @@ async function createCompleteReportImage(ctx) {
 }
 
 function drawSummaryStrip(c, ctx, x, y, width, height) {
-  const vals = ctx.rows.map(r => r.v);
+  const vals = (ctx.analysisRows || ctx.rows).map(r => r.v);
   const st = computeStats(vals);
   const fields = [
     ['N', st.n.toLocaleString('pt-BR')],
@@ -2178,12 +3007,37 @@ function renderRows(rows, sourceLabel) {
   hideLoading();
 }
 
+function renderRows(rows, sourceLabel) {
+  if(!rows.length) throw new Error('Nenhuma linha valida encontrada.');
+
+  loadingMsg('Calculando estatisticas...');
+  const totalRows = rows.length;
+  CURRENT_DATASET = { rows, sourceLabel, totalRows };
+  CURRENT_VIEW_ROWS = rows;
+  Object.keys(EXPORT_CONTEXTS).forEach(key => delete EXPORT_CONTEXTS[key]);
+
+  const dateRange = minMax(rows.map(r => r._dt));
+  if(!dateRange) throw new Error('Nenhuma data valida encontrada.');
+  const dMin = new Date(dateRange.min);
+  const dMax = new Date(dateRange.max);
+
+  const availParams = Object.entries(PARAMS).filter(([k, cfg]) => rows.some(r => paramValueIsValid(r[k], cfg)));
+  if(!availParams.length) throw new Error('Nenhuma coluna de parametro reconhecida. Esperado: CO2, NOx, PM1, PM10, PM2.5, Pressao, Temp, Umid, VOC');
+
+  setupAnalysisControls(rows, dMin, dMax, availParams);
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('app-section').style.display = 'block';
+  renderCurrentView({preserveTab:false});
+  hideLoading();
+}
+
 async function startIseqJob(event) {
   event.preventDefault();
   const backendUrl = getBackendUrl();
   const equipmentId = document.getElementById('equipment-id').value.trim();
   const start = normalizeInputDate(document.getElementById('start-date').value);
   const end = normalizeInputDate(document.getElementById('end-date').value);
+  const workers = Number(document.getElementById('job-workers')?.value || 3);
 
   if(!equipmentId || !start || !end) {
     setIseqStatus('Preencha equipamento, início e fim.', 'error');
@@ -2197,7 +3051,7 @@ async function startIseqJob(event) {
     const created = await fetchJson(`${backendUrl}/api/iseq/jobs`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({equipment_id:equipmentId, start, end})
+      body:JSON.stringify({equipment_id:equipmentId, start, end, workers})
     });
     await pollIseqJob(backendUrl, created.id);
   } catch(err) {

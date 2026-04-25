@@ -49,7 +49,7 @@ class ApiReportCollector(IseqCollector):
         self._list_reports()
 
     def fetch_export(self, task: ExportTask, destination_dir: Path) -> Path:
-        report = self._safe_find_ready_report(task) or self._generate_and_wait(task)
+        report = self._generate_and_wait(task)
         report_id = report.get("id")
         if not report_id:
             raise RuntimeError(f"Relatorio pronto sem id para {task.parameter}.")
@@ -58,11 +58,10 @@ class ApiReportCollector(IseqCollector):
         if not isinstance(data, bytes):
             data = self._request_bytes(f"reports/{report_id}/download")
         destination_dir.mkdir(parents=True, exist_ok=True)
-        filename = self._safe_filename(report.get("nome") or f"{task.parameter}_{task.start:%Y%m%d}_{task.end:%Y%m%d}.xlsx")
-        if not filename.lower().endswith(".xlsx"):
-            filename += ".xlsx"
+        filename = self._task_filename(task, report.get("nome"))
         destination = destination_dir / filename
         destination.write_bytes(data)
+        self._validate_export_period(destination, task)
         return destination
 
     def _safe_find_ready_report(self, task: ExportTask) -> dict[str, object] | None:
@@ -152,6 +151,8 @@ class ApiReportCollector(IseqCollector):
 
         data_ini = self._parse_report_datetime(report.get("dataIni"))
         data_fim = self._parse_report_datetime(report.get("dataFim"))
+        if not data_ini or not data_fim:
+            return False
         if data_ini and abs((data_ini - self._api_naive_utc(task.start)).total_seconds()) > 120:
             return False
         if data_fim and abs((data_fim - self._api_naive_utc(task.end)).total_seconds()) > 120:
@@ -243,6 +244,39 @@ class ApiReportCollector(IseqCollector):
         text = str(name or "relatorio.xlsx")
         return "".join(ch if ch.isalnum() or ch in "._- " else "_" for ch in text).strip() or "relatorio.xlsx"
 
+    def _task_filename(self, task: ExportTask, original_name: object | None = None) -> str:
+        original = self._safe_filename(original_name or "relatorio.xlsx")
+        if original.lower().endswith(".xlsx"):
+            original = original[:-5]
+        equipment = task.equipment_id.replace(":", "_")
+        parameter = task.parameter.replace(".", "_")
+        return (
+            f"{parameter}_{equipment}_"
+            f"{task.start:%Y%m%dT%H%M%S}_{task.end:%Y%m%dT%H%M%S}_"
+            f"{original}.xlsx"
+        )
+
+    def _validate_export_period(self, path: Path, task: ExportTask) -> None:
+        records = parse_iseq_xlsx(path)
+        if not records:
+            return
+        matching = [
+            record for record in records
+            if record.parameter == task.parameter and task.start <= record.data_local <= task.end
+        ]
+        if matching:
+            return
+        first = min(record.data_local for record in records)
+        last = max(record.data_local for record in records)
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"Relatorio {task.parameter} retornou dados fora do intervalo solicitado "
+            f"({first:%Y-%m-%d %H:%M:%S} a {last:%Y-%m-%d %H:%M:%S})."
+        )
+
 
 class LocalExportCollector(IseqCollector):
     """Uses already downloaded ISEQ XLSX files.
@@ -280,7 +314,11 @@ class LocalExportCollector(IseqCollector):
 
         source = max(period_matches, key=lambda p: p.stat().st_mtime)
         destination_dir.mkdir(parents=True, exist_ok=True)
-        destination = destination_dir / f"{task.parameter.replace('.', '_')}_{int(time.time())}.xlsx"
+        equipment = task.equipment_id.replace(":", "_")
+        parameter = task.parameter.replace(".", "_")
+        destination = destination_dir / (
+            f"{parameter}_{equipment}_{task.start:%Y%m%dT%H%M%S}_{task.end:%Y%m%dT%H%M%S}_local.xlsx"
+        )
         shutil.copy2(source, destination)
         return destination
 

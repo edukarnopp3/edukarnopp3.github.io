@@ -20,7 +20,7 @@ python -m playwright install chromium
 
 Esse modo abre uma janela de login do ISEQ, espera voce entrar, captura o token localmente e sobe o backend em `http://127.0.0.1:8000`. O token nao e impresso nem salvo no repositorio.
 
-Por padrao, o backend baixa 1 relatorio por vez e divide o periodo em blocos de 1 dia. Essa configuracao e mais lenta, mas evita os erros `504 Gateway Time-out` que aparecem em relatorios grandes, principalmente CO2.
+Por padrao, o backend baixa ate 3 relatorios por vez e divide o periodo em blocos de 1 dia. No painel, o campo `Requisições simultâneas` permite escolher 1, 2 ou 3 por busca. Use 1 se o site da ISEQ estiver instavel ou com erros `504 Gateway Time-out`.
 
 Se o site estiver estavel, voce pode ajustar antes de iniciar:
 

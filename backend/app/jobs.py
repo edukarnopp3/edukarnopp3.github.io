@@ -49,6 +49,7 @@ class JobState:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     total_tasks: int = 0
+    worker_count: int = 1
     completed_tasks: int = 0
     attempted_tasks: int = 0
     failed_attempts: int = 0
@@ -66,12 +67,12 @@ class JobStore:
         self.lock = threading.RLock()
         self.collector = build_collector()
         try:
-            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "1"))
+            configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "3"))
         except ValueError:
-            configured_workers = 1
-        self.max_workers = max(1, min(configured_workers, 6))
+            configured_workers = 3
+        self.default_workers = self._normalize_worker_count(configured_workers)
 
-    def create_job(self, equipment_id: str, start: datetime, end: datetime) -> JobState:
+    def create_job(self, equipment_id: str, start: datetime, end: datetime, workers: object | None = None) -> JobState:
         job_id = uuid.uuid4().hex[:12]
         export_tasks = build_export_tasks(equipment_id, start, end)
         job = JobState(
@@ -80,6 +81,7 @@ class JobStore:
             start=start.isoformat(timespec="seconds"),
             end=end.isoformat(timespec="seconds"),
             total_tasks=len(export_tasks),
+            worker_count=self._normalize_worker_count(workers),
             tasks=[self._task_to_state(task) for task in export_tasks],
         )
         with self.lock:
@@ -109,7 +111,7 @@ class JobStore:
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs[job_id]
-            worker_count = min(self.max_workers, max(1, job.total_tasks))
+            worker_count = min(job.worker_count, max(1, job.total_tasks))
             job.status = "running"
             job.message = f"Exportando parâmetros com {worker_count} tarefas em paralelo."
             job.updated_at = datetime.now().isoformat(timespec="seconds")
@@ -295,6 +297,15 @@ class JobStore:
     def _has_marker(self, text: str, markers: tuple[str, ...]) -> bool:
         lower = text.lower()
         return any(marker.lower() in lower for marker in markers)
+
+    def _normalize_worker_count(self, value: object | None) -> int:
+        if value is None or value == "":
+            return self.default_workers if hasattr(self, "default_workers") else 3
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            parsed = self.default_workers if hasattr(self, "default_workers") else 3
+        return max(1, min(parsed, 6))
 
     def _finalize_job(self, job: JobState) -> None:
         files = [task.file_path for task in job.tasks if task.file_path]

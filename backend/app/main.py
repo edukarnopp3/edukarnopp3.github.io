@@ -25,10 +25,18 @@ app.add_middleware(
 store = JobStore(storage_dir=os.getenv("ISEQ_STORAGE_DIR", "backend/storage"))
 
 
+@app.middleware("http")
+async def add_private_network_header(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
+
 class JobRequest(BaseModel):
     equipment_id: str = Field(default=DEFAULT_EQUIPMENT)
     start: datetime
     end: datetime
+    workers: int | None = Field(default=None, ge=1, le=6)
 
 
 @app.get("/api/health")
@@ -40,7 +48,7 @@ def health() -> dict[str, str]:
 def create_job(payload: JobRequest) -> dict[str, object]:
     if payload.end <= payload.start:
         raise HTTPException(status_code=400, detail="A data final deve ser posterior à data inicial.")
-    job = store.create_job(payload.equipment_id, payload.start, payload.end)
+    job = store.create_job(payload.equipment_id, payload.start, payload.end, workers=payload.workers)
     return asdict(job)
 
 
