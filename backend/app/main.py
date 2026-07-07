@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-store = JobStore(storage_dir=os.getenv("ISEQ_STORAGE_DIR", "backend/storage"))
+store = JobStore(storage_dir=os.getenv("ISEQ_STORAGE_DIR", "storage"))
 
 
 @app.middleware("http")

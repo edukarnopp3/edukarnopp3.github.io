@@ -747,7 +747,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.7</span>
+    <span class="badge">v2.8</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -944,7 +944,21 @@ const PARAM_ALIASES = {
   temp:'Temp', temperatura:'Temp',
   pressao:'Pressao', press:'Pressao'
 };
-const DEFAULT_BACKEND_URL = localStorage.getItem('iseqBackendUrl') || 'http://127.0.0.1:8000';
+const LOCAL_BACKEND_URL = 'http://127.0.0.1:8000';
+const CLOUD_BACKEND_URL = 'https://iseq-export-backend.onrender.com';
+function defaultBackendUrl() {
+  const queryBackend = new URLSearchParams(location.search).get('backend');
+  if(queryBackend) {
+    localStorage.setItem('iseqBackendUrl', queryBackend);
+    return queryBackend;
+  }
+  const saved = localStorage.getItem('iseqBackendUrl');
+  const onGithubPages = location.hostname.endsWith('github.io');
+  const savedIsLocal = saved && /localhost|127\.0\.0\.1/.test(saved);
+  if(saved && (!onGithubPages || !savedIsLocal)) return saved;
+  return onGithubPages ? CLOUD_BACKEND_URL : LOCAL_BACKEND_URL;
+}
+const DEFAULT_BACKEND_URL = defaultBackendUrl();
 const CHART_MAIN_COLOR = '#D94A3A';
 const CHART_FILL_COLOR = 'rgba(217,74,58,0.20)';
 const CHART_GRID_COLOR = '#DDE2E6';
@@ -3470,16 +3484,19 @@ async function loadIseqEnvironments(options={}) {
   const {silent=false} = options;
   const backendUrl = getBackendUrl();
   try {
+    if(!silent) {
+      setIseqStatus(`Conectando ao ${backendModeLabel()}...`, '');
+    }
     const payload = await fetchJson(`${backendUrl}/api/iseq/equipment`);
     const equipment = Array.isArray(payload.equipment) ? payload.equipment : [];
     populateIseqEnvironmentSelects(equipment);
     if(!silent) {
-      setIseqStatus(`${ISEQ_EQUIPMENT.length} ambiente(s) carregado(s).`, 'done');
+      setIseqStatus(`${ISEQ_EQUIPMENT.length} ambiente(s) carregado(s) pelo ${backendModeLabel()}.`, 'done');
     }
   } catch(err) {
     populateIseqEnvironmentSelects(ISEQ_EQUIPMENT);
     if(!silent) {
-      setIseqStatus(`Não foi possível carregar ambientes: ${err.message}`, 'error');
+      setIseqStatus(`Não foi possível carregar ambientes pelo ${backendModeLabel()}: ${err.message}`, 'error');
     }
   }
 }
@@ -3515,9 +3532,10 @@ async function startIseqJob(event) {
       fetchIseqRowsForSensor(backendUrl, sensor.equipmentId, start, end, workersPerSensor, sensor.key, sensor.label)
     ));
     const rows = rowGroups.flat();
+    const sourceBackend = backendModeLabel();
     const sourceLabel = sensors.length > 1
-      ? `ISEQ backend · ${sensors.length} sensores · ${start} a ${end}`
-      : `ISEQ backend · ${sensors[0].equipmentId}`;
+      ? `ISEQ ${sourceBackend} · ${sensors.length} sensores · ${start} a ${end}`
+      : `ISEQ ${sourceBackend} · ${sensors[0].equipmentId}`;
     renderRows(rows, sourceLabel);
   } catch(err) {
     setIseqStatus(`Falha ao iniciar: ${err.message}`, 'error');
@@ -3564,6 +3582,14 @@ function normalizeInputDate(value) {
 function getBackendUrl() {
   const inputValue = document.getElementById('backend-url')?.value || '';
   return (inputValue.trim() || DEFAULT_BACKEND_URL).replace(/\/+$/, '');
+}
+
+function backendModeLabel() {
+  const backendUrl = getBackendUrl();
+  if(backendUrl.includes('127.0.0.1') || backendUrl.includes('localhost')) {
+    return 'backend local';
+  }
+  return 'backend online';
 }
 
 async function fetchJson(url, options) {
@@ -3644,6 +3670,7 @@ function showToast(msg, dur=5000) {
 });
 
 document.getElementById('backend-url').value = DEFAULT_BACKEND_URL;
+setIseqStatus(`Usando ${backendModeLabel()}: ${getBackendUrl()}`, '');
 document.getElementById('iseq-form').addEventListener('submit', startIseqJob);
 document.getElementById('environment-1')?.addEventListener('change', () => {
   const env1 = document.getElementById('environment-1');

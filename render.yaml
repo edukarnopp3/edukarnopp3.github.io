@@ -5,6 +5,13 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
       - key: CORS_ORIGINS
         value: "*"
+      - key: ISEQ_STORAGE_DIR
+        value: storage
+      - key: ISEQ_JOB_WORKERS
+        value: "3"
+      - key: ISEQ_CHUNK_DAYS
+        value: "1"

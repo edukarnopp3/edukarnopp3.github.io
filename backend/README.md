@@ -42,6 +42,36 @@ python dev_server.py
 
 O token deve vir do login atual do ISEQ e nao deve ser salvo no GitHub. Se ele expirar, faca login de novo no ISEQ e atualize essa variavel.
 
+## Rodar online no Render
+
+O site publicado no GitHub Pages usa automaticamente o backend online:
+
+```text
+https://iseq-export-backend.onrender.com
+```
+
+Para ativar esse fluxo:
+
+1. Crie um Web Service no Render a partir deste repositorio.
+2. Use o arquivo `render.yaml` do repositorio.
+3. No painel do Render, adicione a variavel secreta:
+
+```text
+ISEQ_BEARER_TOKEN=COLE_SEU_TOKEN_AQUI
+```
+
+Nao salve esse token no GitHub. Ele deve ficar apenas nas Environment Variables do Render.
+
+Se a ISEQ recusar a busca com erro 401/403, o token expirou. Gere um token novo com login local e atualize `ISEQ_BEARER_TOKEN` no Render.
+
+Se o Render gerar uma URL diferente, abra o painel uma vez com:
+
+```text
+https://edukarnopp3.github.io/?backend=https://SUA-URL.onrender.com
+```
+
+O navegador salva essa URL para os proximos acessos.
+
 Modo simples, sem instalar FastAPI, usando arquivos ja baixados:
 
 ```powershell
