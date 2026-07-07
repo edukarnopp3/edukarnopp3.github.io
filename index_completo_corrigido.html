@@ -414,6 +414,21 @@
     font-family: 'Space Mono', monospace;
     font-weight: 700;
   }
+  .sensor-comparison-block {
+    display: grid;
+    gap: 14px;
+    margin: 0 0 18px;
+  }
+  .sensor-comparison-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .sensor-comparison-note {
+    color: var(--muted);
+    margin: 8px 0 0;
+  }
+  .sensor-comparison-charts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .chart-explainer {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -698,7 +713,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.5</span>
+    <span class="badge">v2.6</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -1472,11 +1487,13 @@ function sensorComparisonForParam(col, cfg) {
   if(sensors.length < 2) return null;
   const [s1, s2] = sensors;
   const grouped = new Map();
+  const validMinutes = {[s1.key]:new Set(), [s2.key]:new Set()};
   rowsForSensorComparison().forEach(row => {
     const key = sensorKeyForRow(row);
     if(key !== s1.key && key !== s2.key) return;
     if(!paramValueIsValid(row[col], cfg)) return;
     const k = minuteKey(row._dt);
+    validMinutes[key].add(k);
     if(!grouped.has(k)) grouped.set(k, {});
     const bucket = grouped.get(k);
     if(!bucket[key]) bucket[key] = [];
@@ -1489,41 +1506,86 @@ function sensorComparisonForParam(col, cfg) {
     const v1 = mean(bucket[s1.key]);
     const v2 = mean(bucket[s2.key]);
     const diff = v2 - v1;
+    const pairMean = (v1 + v2) / 2;
     pairs.push({
       key,
       dt:new Date(`${key}:00`),
       v1,
       v2,
+      pairMean,
       diff,
       pct:Math.abs(v1) > 1e-12 ? (diff / v1) * 100 : null,
+      relativeDiff:Math.abs(pairMean) > 1e-12 ? (diff / pairMean) * 100 : null,
+      absoluteRelativeDiff:Math.abs(pairMean) > 1e-12 ? (Math.abs(diff) / Math.abs(pairMean)) * 100 : null,
     });
   });
+  pairs.sort((a,b) => a.dt - b.dt);
   if(!pairs.length) return { sensors:[s1,s2], pairs:[], stats:null };
 
   const diffs = pairs.map(p => p.diff);
   const absDiffs = pairs.map(p => Math.abs(p.diff));
   const pcts = pairs.map(p => p.pct).filter(v => Number.isFinite(v));
+  const relativeDiffs = pairs.map(p => p.relativeDiff).filter(v => Number.isFinite(v));
+  const absRelativeDiffs = pairs.map(p => p.absoluteRelativeDiff).filter(v => Number.isFinite(v));
+  const pairMeans = pairs.map(p => p.pairMean);
   const vals1 = pairs.map(p => p.v1);
   const vals2 = pairs.map(p => p.v2);
+  const mae = mean(absDiffs);
+  const rmse = Math.sqrt(mean(diffs.map(v => v * v)));
+  const baseline = Math.abs(mean(pairMeans));
+  const diffStd = std(diffs);
+  const regression = linearRegression(vals1, vals2);
+  const pairedCoverageBase = Math.min(validMinutes[s1.key].size, validMinutes[s2.key].size);
   return {
     sensors:[s1,s2],
     pairs,
     stats:{
       n:pairs.length,
+      n1:validMinutes[s1.key].size,
+      n2:validMinutes[s2.key].size,
+      pairedCoverage:pairedCoverageBase ? (pairs.length / pairedCoverageBase) * 100 : null,
       mean1:mean(vals1),
       mean2:mean(vals2),
       meanDiff:mean(diffs),
       medianDiff:median(diffs),
       meanAbsDiff:mean(absDiffs),
+      mae,
+      rmse,
+      nrmse:baseline > 1e-12 ? (rmse / baseline) * 100 : null,
+      diffStd,
+      loaLow:mean(diffs) - 1.96 * diffStd,
+      loaHigh:mean(diffs) + 1.96 * diffStd,
       meanPct:pcts.length ? mean(pcts) : null,
       medianPct:pcts.length ? median(pcts) : null,
+      meanRelativeDiff:relativeDiffs.length ? mean(relativeDiffs) : null,
+      meanAbsRelativeDiff:absRelativeDiffs.length ? mean(absRelativeDiffs) : null,
       maxAbsDiff:Math.max(...absDiffs),
+      regression,
     }
   };
 }
 
-function buildSensorComparisonHtml(col, cfg) {
-  const comp = sensorComparisonForParam(col, cfg);
+function relativeComparisonIsUseful(col) {
+  return !['Temp'].includes(col);
+}
+
+function sensorAgreementText(comp, cfg, col) {
+  const [s1, s2] = comp.sensors;
+  const st = comp.stats;
+  const direction = Math.abs(st.meanDiff) < 1e-12
+    ? 'sem vies medio relevante'
+    : st.meanDiff > 0
+      ? `${s2.label} leu acima de ${s1.label}`
+      : `${s2.label} leu abaixo de ${s1.label}`;
+  const rel = relativeComparisonIsUseful(col) && st.meanAbsRelativeDiff != null
+    ? ` A diferenca relativa absoluta media foi ${fmt(st.meanAbsRelativeDiff, 1)}%.`
+    : '';
+  const r = st.regression?.r == null ? '' : ` A correlacao temporal foi r=${fmtSigned(st.regression.r, 2)}.`;
+  return `Foram pareados ${st.n.toLocaleString('pt-BR')} minuto(s). Em media, ${direction} em ${fmtSigned(st.meanDiff)} ${cfg.unidade}.${rel}${r} Esta comparacao avalia concordancia entre sensores co-localizados; sem instrumento de referencia, nao define qual sensor esta correto.`;
+}
+
+function buildSensorComparisonHtml(col, cfg, comp=null, chartIds={}) {
+  comp = comp || sensorComparisonForParam(col, cfg);
   if(!comp) return '';
   if(!comp.stats) {
     return `
@@ -1535,46 +1597,105 @@ function buildSensorComparisonHtml(col, cfg) {
   }
   const [s1, s2] = comp.sensors;
   const st = comp.stats;
-  const pctText = st.meanPct == null ? '—' : `${fmtSigned(st.meanPct, 1)}%`;
-  const medianPctText = st.medianPct == null ? '—' : `${fmtSigned(st.medianPct, 1)}%`;
-  return `
-    <div class="analysis-note">
-      <div class="title">Comparativo entre sensores</div>
-      <p>${s2.label} - ${s1.label}: diferença média ${fmtSigned(st.meanDiff)} ${cfg.unidade} (${pctText}), com diferença absoluta média de ${fmt(st.meanAbsDiff)} ${cfg.unidade} em ${st.n.toLocaleString('pt-BR')} minutos pareados.</p>
-      <div class="comparison-table">
-        <div class="comparison-cell">
-          <div class="lbl">Média ${s1.label}</div>
-          <div class="val">${fmt(st.mean1)} ${cfg.unidade}</div>
+  const pctText = !relativeComparisonIsUseful(col) || st.meanRelativeDiff == null ? '---' : `${fmtSigned(st.meanRelativeDiff, 1)}%`;
+  const absPctText = !relativeComparisonIsUseful(col) || st.meanAbsRelativeDiff == null ? '---' : `${fmt(st.meanAbsRelativeDiff, 1)}%`;
+  const nrmseText = st.nrmse == null ? '---' : `${fmt(st.nrmse, 1)}%`;
+  const rText = st.regression?.r == null ? '---' : fmtSigned(st.regression.r, 2);
+  const r2Text = st.regression?.r2 == null ? '---' : fmt(st.regression.r2, 2);
+  const slopeText = st.regression?.slope == null ? '---' : fmt(st.regression.slope, 3);
+  const interceptText = st.regression?.intercept == null ? '---' : `${fmtSigned(st.regression.intercept)} ${cfg.unidade}`;
+  const coverageText = st.pairedCoverage == null ? '---' : `${fmt(st.pairedCoverage, 1)}%`;
+  const charts = chartIds.time && chartIds.scatter && chartIds.bland ? `
+      <div class="charts-grid-bottom sensor-comparison-charts">
+        <div class="chart-card">
+          <div class="chart-topbar">
+            <div class="chart-title">SENSORES NO TEMPO</div>
+            <button class="chart-download" onclick="downloadChart('${chartIds.time}','${col.toLowerCase().replace(/\./g,'-')}-sensores-tempo')">Baixar PNG</button>
+          </div>
+          <div id="${chartIds.time}"></div>
         </div>
-        <div class="comparison-cell">
-          <div class="lbl">Média ${s2.label}</div>
-          <div class="val">${fmt(st.mean2)} ${cfg.unidade}</div>
+        <div class="chart-card">
+          <div class="chart-topbar">
+            <div class="chart-title">SENSOR 1 x SENSOR 2</div>
+            <button class="chart-download" onclick="downloadChart('${chartIds.scatter}','${col.toLowerCase().replace(/\./g,'-')}-sensores-dispersao')">Baixar PNG</button>
+          </div>
+          <div id="${chartIds.scatter}"></div>
         </div>
-        <div class="comparison-cell">
-          <div class="lbl">Diferença média</div>
-          <div class="val">${fmtSigned(st.meanDiff)} ${cfg.unidade}</div>
-        </div>
-        <div class="comparison-cell">
-          <div class="lbl">Diferença média (%)</div>
-          <div class="val">${pctText}</div>
-        </div>
-        <div class="comparison-cell">
-          <div class="lbl">Mediana da diferença</div>
-          <div class="val">${fmtSigned(st.medianDiff)} ${cfg.unidade}</div>
-        </div>
-        <div class="comparison-cell">
-          <div class="lbl">Mediana da diferença (%)</div>
-          <div class="val">${medianPctText}</div>
-        </div>
-        <div class="comparison-cell">
-          <div class="lbl">Diferença absoluta média</div>
-          <div class="val">${fmt(st.meanAbsDiff)} ${cfg.unidade}</div>
-        </div>
-        <div class="comparison-cell">
-          <div class="lbl">Maior diferença absoluta</div>
-          <div class="val">${fmt(st.maxAbsDiff)} ${cfg.unidade}</div>
+        <div class="chart-card">
+          <div class="chart-topbar">
+            <div class="chart-title">BLAND-ALTMAN</div>
+            <button class="chart-download" onclick="downloadChart('${chartIds.bland}','${col.toLowerCase().replace(/\./g,'-')}-bland-altman')">Baixar PNG</button>
+          </div>
+          <div id="${chartIds.bland}"></div>
         </div>
       </div>
+    ` : '';
+  return `
+    <div class="sensor-comparison-block">
+      <div class="analysis-note">
+        <div class="title">Concordancia entre sensores</div>
+        <p>${sensorAgreementText(comp, cfg, col)}</p>
+        <div class="comparison-table sensor-comparison-grid">
+          <div class="comparison-cell">
+            <div class="lbl">Minutos pareados</div>
+            <div class="val">${st.n.toLocaleString('pt-BR')}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Cobertura pareada</div>
+            <div class="val">${coverageText}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Media ${s1.label}</div>
+            <div class="val">${fmt(st.mean1)} ${cfg.unidade}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Media ${s2.label}</div>
+            <div class="val">${fmt(st.mean2)} ${cfg.unidade}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Vies medio S2-S1</div>
+            <div class="val">${fmtSigned(st.meanDiff)} ${cfg.unidade}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Diferenca relativa</div>
+            <div class="val">${pctText}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Diferenca relativa abs.</div>
+            <div class="val">${absPctText}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">MAE</div>
+            <div class="val">${fmt(st.mae)} ${cfg.unidade}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">RMSE</div>
+            <div class="val">${fmt(st.rmse)} ${cfg.unidade}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">NRMSE</div>
+            <div class="val">${nrmseText}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">R / R2</div>
+            <div class="val">${rText} / ${r2Text}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Regressao</div>
+            <div class="val">b=${slopeText}; a=${interceptText}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Bland-Altman 95%</div>
+            <div class="val">${fmtSigned(st.loaLow)} a ${fmtSigned(st.loaHigh)} ${cfg.unidade}</div>
+          </div>
+          <div class="comparison-cell">
+            <div class="lbl">Maior diferenca abs.</div>
+            <div class="val">${fmt(st.maxAbsDiff)} ${cfg.unidade}</div>
+          </div>
+        </div>
+        <p class="sensor-comparison-note">Diferenca relativa usa a media dos dois sensores como base. Para temperatura em Celsius, o percentual e omitido; a diferenca em graus e a metrica mais adequada.</p>
+      </div>
+      ${charts}
     </div>
   `;
 }
@@ -1773,6 +1894,19 @@ function pearson(xs, ys) {
   const denX = Math.sqrt(xs.reduce((s, x) => s + (x - mx) ** 2, 0));
   const denY = Math.sqrt(ys.reduce((s, y) => s + (y - my) ** 2, 0));
   return denX && denY ? num / (denX * denY) : null;
+}
+
+function linearRegression(xs, ys) {
+  if(xs.length < 3 || ys.length < 3 || xs.length !== ys.length) return null;
+  const mx = mean(xs);
+  const my = mean(ys);
+  const den = xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+  if(!den) return null;
+  const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+  const slope = num / den;
+  const intercept = my - slope * mx;
+  const r = pearson(xs, ys);
+  return { slope, intercept, r, r2: r == null ? null : r * r };
 }
 
 function correlationForRows(rows, a, b) {
@@ -2283,6 +2417,87 @@ function buildBoxplot(divId, rows, cfg) {
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
 
+function samplePairsForChart(pairs, maxPoints=5000) {
+  if(!pairs || pairs.length <= maxPoints) return pairs || [];
+  const step = Math.ceil(pairs.length / maxPoints);
+  return pairs.filter((_, i) => i % step === 0);
+}
+
+function buildSensorTimeComparison(divId, comp, cfg) {
+  if(!comp?.stats) return;
+  const pairs = samplePairsForChart(comp.pairs, 6000);
+  const [s1, s2] = comp.sensors;
+  const layout={
+    ...PLOT_LAYOUT_BASE,
+    height:270,
+    margin:{...PLOT_LAYOUT_BASE.margin, b:58},
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, type:'date', title:{text:'Data/Hora',font:{size:12}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:12}}},
+    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+  };
+  const traces=[
+    {name:s1.label, x:pairs.map(p=>p.dt), y:pairs.map(p=>p.v1), mode:'lines', type:'scatter',
+      line:{color:CHART_MAIN_COLOR,width:1.7}},
+    {name:s2.label, x:pairs.map(p=>p.dt), y:pairs.map(p=>p.v2), mode:'lines', type:'scatter',
+      line:{color:CHART_MEDIAN_COLOR,width:1.7}},
+  ];
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
+function buildSensorScatter(divId, comp, cfg) {
+  if(!comp?.stats) return;
+  const pairs = samplePairsForChart(comp.pairs, 6000);
+  const [s1, s2] = comp.sensors;
+  const allVals = comp.pairs.flatMap(p => [p.v1, p.v2]);
+  const axisRange = paddedRange(allVals, 0.08) || [0, 1];
+  const reg = comp.stats.regression;
+  const traces=[
+    {name:'Pares por minuto', x:pairs.map(p=>p.v1), y:pairs.map(p=>p.v2), mode:'markers', type:'scatter',
+      marker:{color:CHART_MAIN_COLOR, size:5, opacity:0.45, line:{color:'#FFFFFF',width:0.4}}},
+    {name:'Ideal 1:1', x:axisRange, y:axisRange, mode:'lines', type:'scatter',
+      line:{color:CHART_MEDIAN_COLOR,width:1.8,dash:'dash'}},
+  ];
+  if(reg) {
+    traces.push({name:'Regressao', x:axisRange, y:axisRange.map(x => reg.intercept + reg.slope * x),
+      mode:'lines', type:'scatter', line:{color:CHART_MEAN_COLOR,width:2}});
+  }
+  const layout={
+    ...PLOT_LAYOUT_BASE,
+    height:270,
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, range:axisRange, title:{text:`${s1.label} (${cfg.unidade})`,font:{size:12}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, range:axisRange, title:{text:`${s2.label} (${cfg.unidade})`,font:{size:12}}},
+    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+  };
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
+function buildBlandAltman(divId, comp, cfg) {
+  if(!comp?.stats) return;
+  const pairs = samplePairsForChart(comp.pairs, 6000);
+  const st = comp.stats;
+  const xVals = comp.pairs.map(p => p.pairMean);
+  const xRange = paddedRange(xVals, 0.08) || [0, 1];
+  const traces=[
+    {name:'Diferenca S2-S1', x:pairs.map(p=>p.pairMean), y:pairs.map(p=>p.diff), mode:'markers', type:'scatter',
+      marker:{color:CHART_MAIN_COLOR, size:5, opacity:0.48, line:{color:'#FFFFFF',width:0.4}}},
+    {name:`Vies medio: ${fmtSigned(st.meanDiff)}`, x:xRange, y:[st.meanDiff, st.meanDiff], mode:'lines', type:'scatter',
+      line:{color:CHART_MEDIAN_COLOR,width:2}},
+    {name:'Limite 95% inferior', x:xRange, y:[st.loaLow, st.loaLow], mode:'lines', type:'scatter',
+      line:{color:CHART_MEAN_COLOR,width:1.8,dash:'dash'}},
+    {name:'Limite 95% superior', x:xRange, y:[st.loaHigh, st.loaHigh], mode:'lines', type:'scatter',
+      line:{color:CHART_MEAN_COLOR,width:1.8,dash:'dash'}},
+  ];
+  const yRange = paddedRange([st.loaLow, st.loaHigh, ...comp.pairs.map(p => p.diff)], 0.1);
+  const layout={
+    ...PLOT_LAYOUT_BASE,
+    height:270,
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, range:xRange, title:{text:`Media dos sensores (${cfg.unidade})`,font:{size:12}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, range:yRange || undefined, title:{text:`Sensor 2 - Sensor 1 (${cfg.unidade})`,font:{size:12}}},
+    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+  };
+  Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
+}
+
 function applyExportAxisFonts(axis={}) {
   const next = {
     ...axis,
@@ -2648,6 +2863,9 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
   const dp  = `dp-${col.replace(/\./g,'_')}`;
   const hist = `hist-${col.replace(/\./g,'_')}`;
   const bp  = `bp-${col.replace(/\./g,'_')}`;
+  const sensorTime = `sensor-time-${col.replace(/\./g,'_')}`;
+  const sensorScatter = `sensor-scatter-${col.replace(/\./g,'_')}`;
+  const sensorBland = `sensor-bland-${col.replace(/\./g,'_')}`;
   const slug = col.toLowerCase().replace(/\./g,'-');
   const ctx = { col, cfg, rows, analysisRows, vals, slug, totalRows, sourceLabel:CURRENT_DATASET.sourceLabel,
     outlierInfo, statBase:readAnalysisSettings().statBase,
@@ -2660,7 +2878,12 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
   const advancedStats = buildAdvancedStatsHtml(ctx);
   const summaryHtml = automaticSummaryHtml(col, cfg, analysisRows, rows, outlierInfo);
   const comparisonHtml = buildComparisonHtml(analysisRows, cfg);
-  const sensorComparisonHtml = buildSensorComparisonHtml(col, cfg);
+  const sensorComparison = sensorComparisonForParam(col, cfg);
+  const sensorComparisonHtml = buildSensorComparisonHtml(col, cfg, sensorComparison, {
+    time:sensorTime,
+    scatter:sensorScatter,
+    bland:sensorBland,
+  });
   const explainerHtml = buildGraphExplainerHtml(analysisRows, rows, cfg);
 
   const container = document.getElementById('panels-container');
@@ -2722,6 +2945,11 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
     buildDiurnal(dp, rows, cfg);
     buildHistogram(hist, vals, cfg);
     buildBoxplot(bp, analysisRows, cfg);
+    if(sensorComparison?.stats) {
+      buildSensorTimeComparison(sensorTime, sensorComparison, cfg);
+      buildSensorScatter(sensorScatter, sensorComparison, cfg);
+      buildBlandAltman(sensorBland, sensorComparison, cfg);
+    }
   });
 
   return panelId;
@@ -2736,7 +2964,7 @@ function resizeActivePanelCharts() {
   const active = document.querySelector('.panel.active');
   if (!active) return;
 
-  active.querySelectorAll('[id^="ts-"], [id^="dp-"], [id^="hist-"], [id^="bp-"]').forEach(el => {
+  active.querySelectorAll('[id^="ts-"], [id^="dp-"], [id^="hist-"], [id^="bp-"], [id^="sensor-time-"], [id^="sensor-scatter-"], [id^="sensor-bland-"]').forEach(el => {
     try {
       Plotly.Plots.resize(el);
     } catch (e) {}
