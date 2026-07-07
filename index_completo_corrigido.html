@@ -477,7 +477,7 @@
   .charts-grid-bottom { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
 
   .chart-card {
-    background: var(--surface2); border: 1px solid var(--border);
+    background: #F8FAFC; border: 1px solid #D1D5DB;
     border-radius: var(--radius); overflow: hidden;
   }
   .chart-topbar {
@@ -489,7 +489,7 @@
   }
   .chart-title {
     padding: 0;
-    font-size: 12px; font-weight: 600; color: var(--muted);
+    font-size: 12px; font-weight: 700; color: #111827;
     text-transform: uppercase; letter-spacing: 0.8px;
     font-family: 'Space Mono', monospace;
   }
@@ -698,7 +698,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.4</span>
+    <span class="badge">v2.5</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -725,9 +725,17 @@
       <p>Cria uma tarefa no backend para baixar todos os parâmetros conhecidos e juntar o intervalo solicitado.</p>
       <form class="iseq-form" id="iseq-form">
         <input id="backend-url" type="hidden" value="http://127.0.0.1:8000"/>
-        <div class="field field-full">
-          <label for="equipment-id">Equipamento</label>
-          <input id="equipment-id" type="text" value="1C:69:20:C7:31:D8"/>
+        <div class="field">
+          <label for="environment-1">Ambiente 1</label>
+          <select id="environment-1">
+            <option value="1C:69:20:C7:31:D8">Sensor 1 padrão (1C:69:20:C7:31:D8)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="environment-2">Ambiente 2</label>
+          <select id="environment-2">
+            <option value="">Sem comparação</option>
+          </select>
         </div>
         <div class="field">
           <label for="start-date">Início</label>
@@ -750,6 +758,7 @@
         </div>
         <div class="iseq-actions">
           <button class="btn" type="submit">Buscar todos</button>
+          <button class="chart-download" type="button" onclick="loadIseqEnvironments()">Atualizar ambientes</button>
           <span class="info-text">CO2 · NOx · VOC · PM · Temp · Umid · Pressão</span>
         </div>
       </form>
@@ -830,6 +839,10 @@
             <option value="weekday-weekend">Dias uteis vs fim de semana</option>
           </select>
         </div>
+        <div class="field" id="sensor-select-field" style="display:none">
+          <label for="analysis-sensor">Sensor da analise</label>
+          <select id="analysis-sensor"></select>
+        </div>
       </div>
       <div class="check-row" id="weekday-filters"></div>
       <div class="param-filter-grid" id="param-filters"></div>
@@ -898,15 +911,24 @@ const PARAM_ALIASES = {
   pressao:'Pressao', press:'Pressao'
 };
 const DEFAULT_BACKEND_URL = localStorage.getItem('iseqBackendUrl') || 'http://127.0.0.1:8000';
+const CHART_MAIN_COLOR = '#D94A3A';
+const CHART_FILL_COLOR = 'rgba(217,74,58,0.20)';
+const CHART_GRID_COLOR = '#DDE2E6';
+const CHART_AXIS_COLOR = '#B8BDC2';
+const CHART_TEXT_COLOR = '#111111';
+const CHART_PLOT_BG = '#F5F6F8';
+const CHART_PAPER_BG = '#FFFFFF';
+const CHART_MEAN_COLOR = '#E6A817';
+const CHART_MEDIAN_COLOR = '#2F3440';
 
 const PLOT_LAYOUT_BASE = {
-  paper_bgcolor:'transparent', plot_bgcolor:'#1C2333',
-  font:{ family:"'DM Sans', sans-serif", color:'#E6EDF3', size:11 },
-  margin:{ t:10, b:46, l:52, r:18 },
-  xaxis:{ gridcolor:'#30363D', linecolor:'#30363D', zerolinecolor:'#30363D' },
-  yaxis:{ gridcolor:'#30363D', linecolor:'#30363D', zerolinecolor:'#30363D' },
-  legend:{ bgcolor:'rgba(22,27,34,0.85)', bordercolor:'#30363D', borderwidth:1, font:{size:10} },
-  hoverlabel:{ bgcolor:'#1C2333', bordercolor:'#30363D', font:{color:'#E6EDF3', size:12} },
+  paper_bgcolor:CHART_PAPER_BG, plot_bgcolor:CHART_PLOT_BG,
+  font:{ family:"'DM Sans', sans-serif", color:CHART_TEXT_COLOR, size:14 },
+  margin:{ t:20, b:64, l:72, r:18 },
+  xaxis:{ gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, zerolinecolor:CHART_GRID_COLOR, automargin:true, tickfont:{size:13,color:CHART_TEXT_COLOR}, title:{font:{size:14,color:CHART_TEXT_COLOR}} },
+  yaxis:{ gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, zerolinecolor:CHART_GRID_COLOR, automargin:true, tickfont:{size:13,color:CHART_TEXT_COLOR}, title:{font:{size:14,color:CHART_TEXT_COLOR}} },
+  legend:{ bgcolor:'rgba(255,255,255,0.88)', bordercolor:'#D1D5DB', borderwidth:1, font:{size:13,color:CHART_TEXT_COLOR} },
+  hoverlabel:{ bgcolor:'#FFFFFF', bordercolor:'#D1D5DB', font:{color:CHART_TEXT_COLOR, size:13} },
 };
 const PLOT_CONFIG = {
   responsive: true,
@@ -925,8 +947,7 @@ const EXPORT_OPTIONS = [
   { key:'diurnal', label:'Perfil diurno médio', default:true },
   { key:'dailyVariability', label:'Médias diárias + variabilidade', default:true },
   { key:'heatmap', label:'Mapa dia × hora', default:true },
-  { key:'qq', label:'Q-Q plot', default:true },
-  { key:'weekdayBoxplot', label:'Boxplot semanal', default:false },
+  { key:'weekdayBoxplot', label:'Comportamento por dia da semana', default:true },
   { key:'weekdayProfile', label:'Perfil por dia da semana', default:false },
   { key:'monthlyBoxplot', label:'Boxplot mensal', default:false },
   { key:'exceedance', label:'Excedências/limites', default:false },
@@ -937,6 +958,7 @@ let CURRENT_VIEW_ROWS = [];
 let CURRENT_AVAILABLE_PARAMS = [];
 let ANALYSIS_CONTROLS_WIRED = false;
 const WEEKDAY_FILTER_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+const SENSOR_COLORS = { S1:'#58A6FF', S2:'#F59E0B' };
 
 function finiteVals(arr) {
   return arr.filter(v => Number.isFinite(v));
@@ -1003,63 +1025,6 @@ function kurtosisExcess(arr) {
   if(!Number.isFinite(s) || s === 0) return null;
   const m = mean(arr);
   return mean(arr.map(v => ((v - m) / s) ** 4)) - 3;
-}
-
-// Normal quantile (probit) — Peter J. Acklam approximation
-function normPPF(p) {
-  if(p<=0) return -Infinity; if(p>=1) return Infinity;
-  const a=[
-    -39.69683028665376, 220.9460984245205, -275.9285104469687,
-    138.3577518672690, -30.66479806614716, 2.506628277459239
-  ];
-  const b=[
-    -54.47609879822406, 161.5858368580409, -155.6989798598866,
-    66.80131188771972, -13.28068155288572
-  ];
-  const c=[
-    -0.007784894002430293, -0.3223964580411365, -2.400758277161838,
-    -2.549732539343734, 4.374664141464968, 2.938163982698783
-  ];
-  const d=[
-    0.007784695709041462, 0.3224671290700398,
-    2.445134137142996, 3.754408661907416
-  ];
-  const plow = 0.02425;
-  const phigh = 1 - plow;
-  if(p < plow) {
-    const q = Math.sqrt(-2 * Math.log(p));
-    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
-           ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
-  }
-  if(p > phigh) {
-    const q = Math.sqrt(-2 * Math.log(1-p));
-    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
-            ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
-  }
-  const q = p - 0.5;
-  const r = q * q;
-  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5]) * q /
-         (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
-}
-
-function computeQQ(vals) {
-  const n = vals.length;
-  const sorted = [...vals].sort((a,b)=>a-b);
-  if(n < 2) {
-    return { theoretical:[0], observed:sorted, slope:0, intercept:sorted[0] || 0, r2:1 };
-  }
-  const theoretical = sorted.map((_,i) => normPPF((i+1-0.375)/(n+0.25)));
-  // Linear regression
-  const tx = theoretical, ty = sorted;
-  const mx=mean(tx), my=mean(ty);
-  const num=tx.reduce((s,x,i)=>s+(x-mx)*(ty[i]-my),0);
-  const den=tx.reduce((s,x)=>s+(x-mx)**2,0);
-  const slope=den ? num/den : 0, intercept=my-slope*mx;
-  const fitted=tx.map(x=>slope*x+intercept);
-  const ssres=ty.reduce((s,y,i)=>s+(y-fitted[i])**2,0);
-  const sstot=ty.reduce((s,y)=>s+(y-my)**2,0);
-  const r2=sstot === 0 ? 1 : 1-ssres/sstot;
-  return { theoretical, observed:sorted, slope, intercept, r2 };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1439,6 +1404,181 @@ function fillHourSelects() {
   });
 }
 
+function sensorKeyForRow(row) {
+  return row?._sensorKey || 'S1';
+}
+
+function sensorLabelForKey(key) {
+  const meta = (CURRENT_DATASET.sensors || []).find(sensor => sensor.key === key);
+  return meta?.label || key;
+}
+
+function datasetSensors(rows=CURRENT_DATASET.rows) {
+  const map = new Map();
+  rows.forEach(row => {
+    const key = sensorKeyForRow(row);
+    if(!map.has(key)) {
+      map.set(key, {
+        key,
+        label: row._sensorLabel || key,
+        equipmentId: row._equipmentId || '',
+      });
+    }
+  });
+  return [...map.values()].sort((a,b) => a.key.localeCompare(b.key));
+}
+
+function hasMultipleSensors() {
+  return (CURRENT_DATASET.sensors || []).length > 1;
+}
+
+function tagSensorRows(rows, sensorKey, sensorLabel, equipmentId) {
+  return rows.map(row => ({
+    ...row,
+    _sensorKey: sensorKey,
+    _sensorLabel: sensorLabel,
+    _equipmentId: equipmentId,
+  }));
+}
+
+function minuteKey(dt) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+}
+
+function applyTemporalFilters(rows) {
+  const settings = readAnalysisSettings();
+  return rows.filter(row => {
+    const dt = row._dt;
+    if(!(dt instanceof Date) || isNaN(dt)) return false;
+    if(settings.start && dt < settings.start) return false;
+    if(settings.end && dt > settings.end) return false;
+    const hour = dt.getHours();
+    const inHour = settings.hourStart <= settings.hourEnd
+      ? hour >= settings.hourStart && hour <= settings.hourEnd
+      : hour >= settings.hourStart || hour <= settings.hourEnd;
+    if(!inHour) return false;
+    if(settings.weekdays.size && !settings.weekdays.has(dt.getDay())) return false;
+    return true;
+  });
+}
+
+function rowsForSensorComparison() {
+  return applyTemporalFilters(CURRENT_DATASET.rows || []);
+}
+
+function sensorComparisonForParam(col, cfg) {
+  const sensors = CURRENT_DATASET.sensors || [];
+  if(sensors.length < 2) return null;
+  const [s1, s2] = sensors;
+  const grouped = new Map();
+  rowsForSensorComparison().forEach(row => {
+    const key = sensorKeyForRow(row);
+    if(key !== s1.key && key !== s2.key) return;
+    if(!paramValueIsValid(row[col], cfg)) return;
+    const k = minuteKey(row._dt);
+    if(!grouped.has(k)) grouped.set(k, {});
+    const bucket = grouped.get(k);
+    if(!bucket[key]) bucket[key] = [];
+    bucket[key].push(parseFloat(row[col]));
+  });
+
+  const pairs = [];
+  grouped.forEach((bucket, key) => {
+    if(!bucket[s1.key]?.length || !bucket[s2.key]?.length) return;
+    const v1 = mean(bucket[s1.key]);
+    const v2 = mean(bucket[s2.key]);
+    const diff = v2 - v1;
+    pairs.push({
+      key,
+      dt:new Date(`${key}:00`),
+      v1,
+      v2,
+      diff,
+      pct:Math.abs(v1) > 1e-12 ? (diff / v1) * 100 : null,
+    });
+  });
+  if(!pairs.length) return { sensors:[s1,s2], pairs:[], stats:null };
+
+  const diffs = pairs.map(p => p.diff);
+  const absDiffs = pairs.map(p => Math.abs(p.diff));
+  const pcts = pairs.map(p => p.pct).filter(v => Number.isFinite(v));
+  const vals1 = pairs.map(p => p.v1);
+  const vals2 = pairs.map(p => p.v2);
+  return {
+    sensors:[s1,s2],
+    pairs,
+    stats:{
+      n:pairs.length,
+      mean1:mean(vals1),
+      mean2:mean(vals2),
+      meanDiff:mean(diffs),
+      medianDiff:median(diffs),
+      meanAbsDiff:mean(absDiffs),
+      meanPct:pcts.length ? mean(pcts) : null,
+      medianPct:pcts.length ? median(pcts) : null,
+      maxAbsDiff:Math.max(...absDiffs),
+    }
+  };
+}
+
+function buildSensorComparisonHtml(col, cfg) {
+  const comp = sensorComparisonForParam(col, cfg);
+  if(!comp) return '';
+  if(!comp.stats) {
+    return `
+      <div class="analysis-note">
+        <div class="title">Comparativo entre sensores</div>
+        <p>Nao houve minutos pareados entre os dois sensores para ${cfg.nome} no filtro atual.</p>
+      </div>
+    `;
+  }
+  const [s1, s2] = comp.sensors;
+  const st = comp.stats;
+  const pctText = st.meanPct == null ? '—' : `${fmtSigned(st.meanPct, 1)}%`;
+  const medianPctText = st.medianPct == null ? '—' : `${fmtSigned(st.medianPct, 1)}%`;
+  return `
+    <div class="analysis-note">
+      <div class="title">Comparativo entre sensores</div>
+      <p>${s2.label} - ${s1.label}: diferença média ${fmtSigned(st.meanDiff)} ${cfg.unidade} (${pctText}), com diferença absoluta média de ${fmt(st.meanAbsDiff)} ${cfg.unidade} em ${st.n.toLocaleString('pt-BR')} minutos pareados.</p>
+      <div class="comparison-table">
+        <div class="comparison-cell">
+          <div class="lbl">Média ${s1.label}</div>
+          <div class="val">${fmt(st.mean1)} ${cfg.unidade}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Média ${s2.label}</div>
+          <div class="val">${fmt(st.mean2)} ${cfg.unidade}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Diferença média</div>
+          <div class="val">${fmtSigned(st.meanDiff)} ${cfg.unidade}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Diferença média (%)</div>
+          <div class="val">${pctText}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Mediana da diferença</div>
+          <div class="val">${fmtSigned(st.medianDiff)} ${cfg.unidade}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Mediana da diferença (%)</div>
+          <div class="val">${medianPctText}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Diferença absoluta média</div>
+          <div class="val">${fmt(st.meanAbsDiff)} ${cfg.unidade}</div>
+        </div>
+        <div class="comparison-cell">
+          <div class="lbl">Maior diferença absoluta</div>
+          <div class="val">${fmt(st.maxAbsDiff)} ${cfg.unidade}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function setupAnalysisControls(rows, dMin, dMax, availParams) {
   CURRENT_AVAILABLE_PARAMS = availParams;
   fillHourSelects();
@@ -1462,12 +1602,24 @@ function setupAnalysisControls(rows, dMin, dMax, availParams) {
   const comparisonMode = document.getElementById('comparison-mode');
   const graphNotes = document.getElementById('graph-notes');
   const presentation = document.getElementById('presentation-mode');
+  const sensorField = document.getElementById('sensor-select-field');
+  const sensorSelect = document.getElementById('analysis-sensor');
   if(statBase) statBase.value = 'instant';
   if(outlierMode) outlierMode.value = 'none';
   if(comparisonMode) comparisonMode.value = 'none';
   if(graphNotes) graphNotes.checked = true;
   if(presentation) presentation.checked = false;
   document.body.classList.remove('presentation-mode');
+
+  const sensors = datasetSensors(rows);
+  CURRENT_DATASET.sensors = sensors;
+  if(sensorField && sensorSelect) {
+    sensorField.style.display = sensors.length > 1 ? '' : 'none';
+    sensorSelect.innerHTML = sensors.map(sensor =>
+      `<option value="${sensor.key}">${sensor.label}</option>`
+    ).join('');
+    sensorSelect.value = sensors[0]?.key || 'S1';
+  }
 
   const weekdays = document.getElementById('weekday-filters');
   if(weekdays) {
@@ -1535,6 +1687,7 @@ function readAnalysisSettings() {
     outlierMode: document.getElementById('outlier-mode')?.value || 'none',
     comparisonMode: document.getElementById('comparison-mode')?.value || 'none',
     showGraphNotes: document.getElementById('graph-notes')?.checked !== false,
+    sensorKey: document.getElementById('analysis-sensor')?.value || 'S1',
     weekdays,
     selectedParams,
   };
@@ -1542,19 +1695,9 @@ function readAnalysisSettings() {
 
 function applyDatasetFilters(rows) {
   const settings = readAnalysisSettings();
-  return rows.filter(row => {
-    const dt = row._dt;
-    if(!(dt instanceof Date) || isNaN(dt)) return false;
-    if(settings.start && dt < settings.start) return false;
-    if(settings.end && dt > settings.end) return false;
-    const hour = dt.getHours();
-    const inHour = settings.hourStart <= settings.hourEnd
-      ? hour >= settings.hourStart && hour <= settings.hourEnd
-      : hour >= settings.hourStart || hour <= settings.hourEnd;
-    if(!inHour) return false;
-    if(settings.weekdays.size && !settings.weekdays.has(dt.getDay())) return false;
-    return true;
-  });
+  return applyTemporalFilters(rows).filter(row =>
+    !hasMultipleSensors() || sensorKeyForRow(row) === settings.sensorKey
+  );
 }
 
 function paramValueIsValid(value, cfg) {
@@ -1832,7 +1975,7 @@ function buildGraphExplainerHtml(analysisRows, instantRows, cfg) {
   const settings = readAnalysisSettings();
   if(!settings.showGraphNotes) return '';
   const vals = analysisRows.map(r => r.v);
-  const qq = computeQQ(vals);
+  const st = computeStats(vals);
   const hourly = hourlyStats(instantRows.length ? instantRows : analysisRows);
   const bestHour = hourly.hours
     .map((hour, i) => ({hour, value:hourly.means[i]}))
@@ -1844,11 +1987,11 @@ function buildGraphExplainerHtml(analysisRows, instantRows, cfg) {
   return `
     <div class="chart-explainer">
       <div>
-        <div class="title">Q-Q plot</div>
-        <p>Quanto mais os pontos seguem a linha, mais a distribuicao se aproxima da normal. Neste recorte, R2 = ${fmt(qq.r2, 3)}.</p>
+        <div class="title">Histograma</div>
+        <p>O histograma mostra a frequencia dos valores observados. Neste recorte, a media e ${fmt(st.mean)} e a mediana e ${fmt(st.median)} ${cfg.unidade}.</p>
       </div>
       <div>
-        <div class="title">Boxplot</div>
+        <div class="title">Dia da semana</div>
         <p>${boxText} Caixas mais altas indicam maior variabilidade.</p>
       </div>
       <div>
@@ -1927,6 +2070,10 @@ function normalizedExportRows() {
   const params = selectedAvailableParams(rows).map(([col]) => col);
   return rows.map(row => {
     const out = { data_local: localIso(row._dt) };
+    if(hasMultipleSensors()) {
+      out.sensor = row._sensorLabel || sensorKeyForRow(row);
+      out.equipamento = row._equipmentId || '';
+    }
     params.forEach(col => {
       const cfg = PARAMS[col];
       out[col] = paramValueIsValid(row[col], cfg) ? parseFloat(row[col]) : null;
@@ -1971,21 +2118,19 @@ function refShapes(cfg, yref='y') {
   const shapes=[], annotations=[];
   if(cfg.alerta!=null) {
     shapes.push({type:'line',x0:0,x1:1,xref:'paper',y0:cfg.alerta,y1:cfg.alerta,yref,
-      line:{color:'#E6A817',width:1.5,dash:'dash'}});
+      line:{color:CHART_MEAN_COLOR,width:1.5,dash:'dash'}, name:'Alerta', showlegend:true});
     annotations.push({x:1,xref:'paper',y:cfg.alerta,yref,text:'Alerta',xanchor:'right',
-      showarrow:false,font:{color:'#E6A817',size:9},bgcolor:'rgba(22,27,34,0.7)',borderpad:2});
+      showarrow:false,font:{color:CHART_MEAN_COLOR,size:10},bgcolor:'rgba(255,255,255,0.86)',borderpad:2});
   }
   if(cfg.critico!=null) {
     shapes.push({type:'line',x0:0,x1:1,xref:'paper',y0:cfg.critico,y1:cfg.critico,yref,
-      line:{color:'#C0392B',width:1.5,dash:'dash'}});
+      line:{color:CHART_MAIN_COLOR,width:1.5,dash:'dash'}, name:'Crítico', showlegend:true});
     annotations.push({x:1,xref:'paper',y:cfg.critico,yref,text:'Crítico',xanchor:'right',
-      showarrow:false,font:{color:'#C0392B',size:9},bgcolor:'rgba(22,27,34,0.7)',borderpad:2});
+      showarrow:false,font:{color:CHART_MAIN_COLOR,size:10},bgcolor:'rgba(255,255,255,0.86)',borderpad:2});
   }
   cfg.refs.forEach(ref=>{
     shapes.push({type:'line',x0:0,x1:1,xref:'paper',y0:ref.valor,y1:ref.valor,yref,
-      line:{color:ref.cor,width:2,dash:ref.dash}});
-    annotations.push({x:0,xref:'paper',y:ref.valor,yref,text:ref.label,xanchor:'left',
-      showarrow:false,font:{color:ref.cor,size:9},bgcolor:'rgba(22,27,34,0.8)',borderpad:2,yanchor:'bottom'});
+      line:{color:ref.cor,width:2,dash:ref.dash}, name:ref.label, showlegend:true});
   });
   return {shapes,annotations};
 }
@@ -1998,16 +2143,16 @@ function buildTimeSeries(divId, rows, cfg) {
   const {shapes,annotations} = refShapes(cfg);
   const traces=[
     { name:'Mín/Máx', x:[...d.dates,...[...d.dates].reverse()],
-      y:[...d.maxs,...[...d.mins].reverse()], fill:'toself', fillcolor:cfg.corClara,
+      y:[...d.maxs,...[...d.mins].reverse()], fill:'toself', fillcolor:CHART_FILL_COLOR,
       line:{color:'transparent'}, mode:'lines', type:'scatter', showlegend:true, hoverinfo:'skip' },
     { name:'Média diária', x:d.dates, y:d.means, mode:'lines',
-      line:{color:cfg.cor,width:2.2}, type:'scatter' },
+      line:{color:CHART_MAIN_COLOR,width:2.2}, type:'scatter' },
   ];
   const layout={
     ...PLOT_LAYOUT_BASE, height:270, margin:{...PLOT_LAYOUT_BASE.margin, b:56},
     shapes, annotations,
-    xaxis:{...PLOT_LAYOUT_BASE.xaxis, type:'date'},
-    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:10}}},
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, type:'date', title:{text:'Data',font:{size:12}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:12}}},
     legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
   };
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
@@ -2030,7 +2175,7 @@ function buildDiurnal(divId, rows, cfg) {
       x:[...h.hours,...[...h.hours].reverse()],
       y:[...h.maxs,...[...h.mins].reverse()],
       fill:'toself',
-      fillcolor:cfg.corClara,
+      fillcolor:CHART_FILL_COLOR,
       line:{color:'transparent'},
       mode:'lines',
       type:'scatter',
@@ -2041,7 +2186,7 @@ function buildDiurnal(divId, rows, cfg) {
       x:h.hours,
       y:h.means,
       mode:'lines',
-      line:{color:cfg.cor,width:2.2},
+      line:{color:CHART_MAIN_COLOR,width:2.2},
       type:'scatter'
     },
     {
@@ -2049,7 +2194,7 @@ function buildDiurnal(divId, rows, cfg) {
       x:h.hours,
       y:h.medians,
       mode:'lines',
-      line:{color:cfg.cor,width:1.4,dash:'dot'},
+      line:{color:CHART_MEDIAN_COLOR,width:1.4,dash:'dot'},
       type:'scatter'
     },
   ];
@@ -2063,11 +2208,11 @@ function buildDiurnal(divId, rows, cfg) {
       ...PLOT_LAYOUT_BASE.xaxis,
       tickvals:Array.from({length:12},(_,i)=>i*2),
       ticktext:Array.from({length:12},(_,i)=>`${String(i*2).padStart(2,'0')}h`),
-      title:{text:'Hora',font:{size:10}}
+      title:{text:'Hora',font:{size:12}}
     },
     yaxis:{
       ...PLOT_LAYOUT_BASE.yaxis,
-      title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:10}},
+      title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:12}},
       range: yRange || undefined
     },
     legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
@@ -2076,26 +2221,30 @@ function buildDiurnal(divId, rows, cfg) {
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
 
-function buildQQ(divId, vals, cfg) {
-  const qq = computeQQ(vals);
-  const lx=[qq.theoretical[0], qq.theoretical[qq.theoretical.length-1]];
-  const ly=lx.map(x=>qq.slope*x+qq.intercept);
+function buildHistogram(divId, vals, cfg) {
+  const st = computeStats(vals);
   const traces=[
-    { x:qq.theoretical, y:qq.observed, mode:'markers', type:'scatter', name:'Dados',
-      marker:{color:cfg.cor, size:4, opacity:0.7, line:{width:0}} },
-    { x:lx, y:ly, mode:'lines', type:'scatter', name:'Linha normal',
-      line:{color:'#E6EDF3', width:1.5} },
+    {
+      x:vals,
+      type:'histogram',
+      nbinsx:42,
+      name:'Frequência',
+      marker:{color:CHART_MAIN_COLOR, opacity:0.76, line:{color:'#FFFFFF', width:1}}
+    }
   ];
   const layout={
-    ...PLOT_LAYOUT_BASE, height:270,
-    xaxis:{...PLOT_LAYOUT_BASE.xaxis, title:{text:'Quantis teóricos',font:{size:10}}},
-    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:'Quantis observados',font:{size:10}}},
-    annotations:[{x:0.97, y:0.05, xref:'paper', yref:'paper',
-      text:`R² = ${qq.r2.toFixed(3)}`, showarrow:false,
-      font:{color:'#E6EDF3',size:11,family:"'Space Mono',monospace"},
-      bgcolor:'rgba(22,27,34,0.9)', bordercolor:'#30363D', borderwidth:1, borderpad:4,
-      xanchor:'right', yanchor:'bottom'}],
-    legend:{...PLOT_LAYOUT_BASE.legend, orientation:'h', x:0, y:1.05},
+    ...PLOT_LAYOUT_BASE,
+    height:270,
+    shapes:[
+      {type:'line', x0:st.mean, x1:st.mean, y0:0, y1:1, xref:'x', yref:'paper',
+        line:{color:CHART_MEAN_COLOR, width:1.8, dash:'dash'}, name:`Média: ${fmt(st.mean)}`, showlegend:true},
+      {type:'line', x0:st.median, x1:st.median, y0:0, y1:1, xref:'x', yref:'paper',
+        line:{color:CHART_MEDIAN_COLOR, width:1.8, dash:'dot'}, name:`Mediana: ${fmt(st.median)}`, showlegend:true},
+    ],
+    annotations:[],
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:12}}},
+    yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:'Frequência',font:{size:12}}},
+    showlegend:true,
   };
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
@@ -2109,11 +2258,12 @@ function buildBoxplot(divId, rows, cfg) {
     y:groups[i],
     type:'box',
     name:dia,
-    marker:{color:cfg.cor, size:3, opacity:0.5},
-    line:{color:cfg.cor},
-    fillcolor:cfg.corClara,
+    marker:{color:CHART_MAIN_COLOR, size:3, opacity:0.5},
+    line:{color:CHART_MAIN_COLOR},
+    fillcolor:CHART_FILL_COLOR,
     whiskerwidth:0.8,
     boxmean:true,
+    showlegend:false,
   }));
 
   const layout={
@@ -2121,33 +2271,51 @@ function buildBoxplot(divId, rows, cfg) {
     height:270,
     shapes,
     annotations,
-    xaxis:{...PLOT_LAYOUT_BASE.xaxis, tickfont:{size:10}},
+    xaxis:{...PLOT_LAYOUT_BASE.xaxis, tickfont:{size:12}},
     yaxis:{
       ...PLOT_LAYOUT_BASE.yaxis,
-      title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:10}},
+      title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:12}},
       range: yRange || undefined
     },
-    showlegend:false,
+    showlegend: cfg.refs.length > 0 || cfg.alerta != null || cfg.critico != null,
   };
 
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
 
+function applyExportAxisFonts(axis={}) {
+  const next = {
+    ...axis,
+    automargin:true,
+    tickfont:{...(axis.tickfont || {}), size:16},
+  };
+  if(axis.title) {
+    next.title = {
+      ...axis.title,
+      font:{...((axis.title && axis.title.font) || {}), size:18},
+    };
+  }
+  return next;
+}
+
 function exportLayout(title, width, height, extra={}) {
-  return {
-    paper_bgcolor:'#FFFFFF',
-    plot_bgcolor:'#F8FAFC',
+  const layout = {
+    paper_bgcolor:CHART_PAPER_BG,
+    plot_bgcolor:CHART_PLOT_BG,
     width,
     height,
-    title:{text:title, font:{size:20, color:'#111827', family:'Arial, sans-serif'}},
-    font:{family:'Arial, sans-serif', color:'#111827', size:13},
-    margin:{t:58, b:62, l:72, r:28},
-    xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', zerolinecolor:'#E5E7EB'},
-    yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', zerolinecolor:'#E5E7EB'},
-    legend:{orientation:'h', x:0, y:1.12, bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#E5E7EB', borderwidth:1, font:{size:11}},
-    hoverlabel:{bgcolor:'#FFFFFF', bordercolor:'#CBD5E1', font:{color:'#111827'}},
+    title:{text:title, font:{size:26, color:CHART_TEXT_COLOR, family:'Arial, sans-serif'}},
+    font:{family:'Arial, sans-serif', color:CHART_TEXT_COLOR, size:18},
+    margin:{t:70, b:86, l:98, r:36},
+    xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, zerolinecolor:CHART_GRID_COLOR},
+    yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, zerolinecolor:CHART_GRID_COLOR},
+    legend:{orientation:'h', x:0, y:1.12, bgcolor:'rgba(255,255,255,0.88)', bordercolor:'#D1D5DB', borderwidth:1, font:{size:15,color:CHART_TEXT_COLOR}},
+    hoverlabel:{bgcolor:'#FFFFFF', bordercolor:'#CBD5E1', font:{color:CHART_TEXT_COLOR}},
     ...extra,
   };
+  layout.xaxis = applyExportAxisFonts(layout.xaxis);
+  layout.yaxis = applyExportAxisFonts(layout.yaxis);
+  return layout;
 }
 
 function exportRefShapes(cfg) {
@@ -2155,9 +2323,7 @@ function exportRefShapes(cfg) {
   const annotations = [];
   const add = (value, label, color, dash='dash') => {
     shapes.push({type:'line', x0:0, x1:1, xref:'paper', y0:value, y1:value, yref:'y',
-      line:{color, width:2, dash}});
-    annotations.push({x:1, xref:'paper', y:value, yref:'y', text:label, showarrow:false,
-      xanchor:'right', yanchor:'bottom', font:{color, size:11}, bgcolor:'rgba(255,255,255,0.8)'});
+      line:{color, width:2, dash}, name:label, showlegend:true});
   };
   if(cfg.alerta != null) add(cfg.alerta, 'Alerta', '#F59E0B');
   if(cfg.critico != null) add(cfg.critico, 'Crítico', '#EF4444');
@@ -2246,13 +2412,13 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     return {
       traces:[
         { name:'Mín/Máx diário', x:[...d.dates,...[...d.dates].reverse()], y:[...d.maxs,...[...d.mins].reverse()],
-          fill:'toself', fillcolor:cfg.corClara, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
-        { name:'Média diária', x:d.dates, y:d.means, mode:'lines+markers', line:{color:cfg.cor,width:3}, marker:{size:5}, type:'scatter' },
+          fill:'toself', fillcolor:CHART_FILL_COLOR, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
+        { name:'Média diária', x:d.dates, y:d.means, mode:'lines', line:{color:CHART_MAIN_COLOR,width:3}, type:'scatter' },
       ],
       layout:exportLayout(`Série Temporal - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', type:'date', title:{text:'Data'}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, type:'date', title:{text:'Data'}},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2263,13 +2429,13 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     return {
       traces:[
         { name:'Mín/Máx horário', x:[...h.dates,...[...h.dates].reverse()], y:[...h.maxs,...[...h.mins].reverse()],
-          fill:'toself', fillcolor:cfg.corClara, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
-        { name:'Média horária', x:h.dates, y:h.means, mode:'lines', line:{color:cfg.cor,width:2.4}, type:'scatter' },
+          fill:'toself', fillcolor:CHART_FILL_COLOR, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip' },
+        { name:'Média horária', x:h.dates, y:h.means, mode:'lines', line:{color:CHART_MAIN_COLOR,width:2.4}, type:'scatter' },
       ],
       layout:exportLayout(`Série Horária - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', type:'date', title:{text:'Data/Hora'}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, type:'date', title:{text:'Data/Hora'}},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2277,20 +2443,17 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
   if(kind === 'histogram') {
     const st = computeStats(vals);
     return {
-      traces:[{x:vals, type:'histogram', histnorm:'probability density', nbinsx:42, name:'Frequência',
-        marker:{color:cfg.cor, opacity:0.72, line:{color:'#FFFFFF', width:1}}}],
+      traces:[{x:vals, type:'histogram', nbinsx:42, name:'Frequência',
+        marker:{color:CHART_MAIN_COLOR, opacity:0.72, line:{color:'#FFFFFF', width:1}}}],
       layout:exportLayout(`Distribuição de Frequências - ${cfg.nome}`, width, height, {
         shapes:[
-          {type:'line', x0:st.mean, x1:st.mean, y0:0, y1:1, xref:'x', yref:'paper', line:{color:'#EF4444', width:2, dash:'dash'}},
-          {type:'line', x0:st.median, x1:st.median, y0:0, y1:1, xref:'x', yref:'paper', line:{color:'#2563EB', width:2, dash:'dot'}},
+          {type:'line', x0:st.mean, x1:st.mean, y0:0, y1:1, xref:'x', yref:'paper', line:{color:CHART_MEAN_COLOR, width:2, dash:'dash'}, name:`Média: ${fmt(st.mean)}`, showlegend:true},
+          {type:'line', x0:st.median, x1:st.median, y0:0, y1:1, xref:'x', yref:'paper', line:{color:CHART_MEDIAN_COLOR, width:2, dash:'dot'}, name:`Mediana: ${fmt(st.median)}`, showlegend:true},
         ],
-        annotations:[
-          {x:st.mean, y:1, xref:'x', yref:'paper', text:`Média: ${fmt(st.mean)}`, showarrow:false, yanchor:'bottom', font:{color:'#EF4444'}},
-          {x:st.median, y:0.92, xref:'x', yref:'paper', text:`Mediana: ${fmt(st.median)}`, showarrow:false, yanchor:'bottom', font:{color:'#2563EB'}},
-        ],
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Densidade'}},
-        showlegend:false,
+        annotations:[],
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:'Frequência'}},
+        showlegend:true,
       })
     };
   }
@@ -2299,12 +2462,12 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     const d = dailyDetailedStats(rows);
     const refs = exportRefShapes(cfg);
     return {
-      traces:d.keys.map((key, i) => ({y:d.values[i], type:'box', name:d.labels[i], marker:{color:cfg.cor, size:3, opacity:0.45},
-        line:{color:cfg.cor}, fillcolor:cfg.corClara, boxmean:true})),
+      traces:d.keys.map((key, i) => ({y:d.values[i], type:'box', name:d.labels[i], marker:{color:CHART_MAIN_COLOR, size:3, opacity:0.45},
+        line:{color:CHART_MAIN_COLOR}, fillcolor:CHART_FILL_COLOR, boxmean:true})),
       layout:exportLayout(`Boxplot Diário - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations, showlegend:false,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickangle:-45},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, tickangle:-45},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2315,14 +2478,14 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     return {
       traces:[
         {name:'Mín/Máx', x:[...h.hours,...[...h.hours].reverse()], y:[...h.maxs,...[...h.mins].reverse()],
-          fill:'toself', fillcolor:cfg.corClara, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip'},
-        {name:'Média', x:h.hours, y:h.means, mode:'lines+markers', line:{color:cfg.cor,width:3}, marker:{size:6}, type:'scatter'},
-        {name:'Mediana', x:h.hours, y:h.medians, mode:'lines', line:{color:'#111827',width:1.5,dash:'dot'}, type:'scatter'},
+          fill:'toself', fillcolor:CHART_FILL_COLOR, line:{color:'transparent'}, mode:'lines', type:'scatter', hoverinfo:'skip'},
+        {name:'Média', x:h.hours, y:h.means, mode:'lines', line:{color:CHART_MAIN_COLOR,width:3}, type:'scatter'},
+        {name:'Mediana', x:h.hours, y:h.medians, mode:'lines', line:{color:CHART_MEDIAN_COLOR,width:1.5,dash:'dot'}, type:'scatter'},
       ],
       layout:exportLayout(`Perfil Diurno Médio - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickvals:Array.from({length:24},(_,i)=>i), title:{text:'Hora do dia'}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, tickvals:Array.from({length:12},(_,i)=>i*2), ticktext:Array.from({length:12},(_,i)=>`${String(i*2).padStart(2,'0')}h`), title:{text:'Hora do dia'}},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2332,15 +2495,15 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     const refs = exportRefShapes(cfg);
     return {
       traces:[
-        {name:'Média diária', x:d.labels, y:d.means, type:'bar', marker:{color:cfg.cor, opacity:0.78},
-          error_y:{type:'data', array:d.stds, visible:true, color:'#111827', thickness:1}},
+        {name:'Média diária', x:d.labels, y:d.means, type:'bar', marker:{color:CHART_MAIN_COLOR, opacity:0.78},
+          error_y:{type:'data', array:d.stds, visible:true, color:CHART_TEXT_COLOR, thickness:1}},
         {name:'Mín', x:d.labels, y:d.mins, type:'scatter', mode:'markers', marker:{color:'#1D4ED8', symbol:'triangle-down', size:7}},
-        {name:'Máx', x:d.labels, y:d.maxs, type:'scatter', mode:'markers', marker:{color:'#EF4444', symbol:'triangle-up', size:7}},
+        {name:'Máx', x:d.labels, y:d.maxs, type:'scatter', mode:'markers', marker:{color:CHART_MAIN_COLOR, symbol:'triangle-up', size:7}},
       ],
       layout:exportLayout(`Médias Diárias com Variabilidade - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickangle:-45, title:{text:'Dia'}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, tickangle:-45, title:{text:'Dia'}},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2353,33 +2516,14 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
         x:h.hours,
         y:h.labels,
         type:'heatmap',
-        colorscale:[[0,'#EFF6FF'], [0.5,cfg.cor], [1,'#111827']],
+        colorscale:[[0,'#FFF5F3'], [0.5,CHART_MAIN_COLOR], [1,'#5B1B14']],
         hovertemplate:'Dia %{y}<br>Hora %{x}:00<br>Média %{z:.2f}<extra></extra>',
         colorbar:{title:cfg.unidade},
       }],
       layout:exportLayout(`Mapa Dia × Hora - ${cfg.nome}`, width, height, {
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Hora do dia'}, tickvals:Array.from({length:12},(_,i)=>i*2)},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Dia'}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:'Hora do dia'}, tickvals:Array.from({length:12},(_,i)=>i*2)},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:'Dia'}},
         showlegend:false,
-      })
-    };
-  }
-
-  if(kind === 'qq') {
-    const qq = computeQQ(vals);
-    const lx=[qq.theoretical[0], qq.theoretical[qq.theoretical.length-1]];
-    const ly=lx.map(x=>qq.slope*x+qq.intercept);
-    return {
-      traces:[
-        {x:qq.theoretical, y:qq.observed, mode:'markers', type:'scatter', name:'Dados',
-          marker:{color:cfg.cor, size:5, opacity:0.65}},
-        {x:lx, y:ly, mode:'lines', type:'scatter', name:'Linha normal', line:{color:'#111827', width:2}},
-      ],
-      layout:exportLayout(`Q-Q Plot (Normalidade) - ${cfg.nome}`, width, height, {
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Quantis teóricos'}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Quantis observados'}},
-        annotations:[{x:0.98, y:0.05, xref:'paper', yref:'paper', text:`R² = ${qq.r2.toFixed(3)}`, showarrow:false,
-          xanchor:'right', yanchor:'bottom', bgcolor:'#FFFFFF', bordercolor:'#CBD5E1', borderwidth:1, borderpad:5}],
       })
     };
   }
@@ -2388,19 +2532,19 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     const groups = weekdayBoxplot(rows);
     const refs = exportRefShapes(cfg);
     return {
-      traces:DIAS.map((dia,i)=>({y:groups[i], type:'box', name:dia, marker:{color:cfg.cor, size:3, opacity:0.5},
-        line:{color:cfg.cor}, fillcolor:cfg.corClara, boxmean:true})),
-      layout:exportLayout(`Boxplot por Dia da Semana - ${cfg.nome}`, width, height, {
-        shapes:refs.shapes, annotations:refs.annotations, showlegend:false,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF'},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+      traces:DIAS.map((dia,i)=>({y:groups[i], type:'box', name:dia, marker:{color:CHART_MAIN_COLOR, size:3, opacity:0.5},
+        line:{color:CHART_MAIN_COLOR}, fillcolor:CHART_FILL_COLOR, boxmean:true, showlegend:false})),
+      layout:exportLayout(`Comportamento por Dia da Semana - ${cfg.nome}`, width, height, {
+        shapes:refs.shapes, annotations:refs.annotations, showlegend:cfg.refs.length > 0 || cfg.alerta != null || cfg.critico != null,
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
 
   if(kind === 'weekdayProfile') {
     const profile = weekdayHourlyProfile(rows);
-    const colors = ['#2563EB','#16A34A','#F59E0B','#DC2626','#7C3AED','#0F766E','#111827'];
+    const colors = ['#D94A3A','#E6A817','#2F3440','#A855F7','#9B2D21','#6B7280','#111111'];
     return {
       traces:profile.series.map((serie,i)=>({
         x:profile.hours,
@@ -2411,8 +2555,8 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
         line:{color:colors[i], width:i < 5 ? 2 : 1.5},
       })),
       layout:exportLayout(`Perfil Horário por Dia da Semana - ${cfg.nome}`, width, height, {
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'Hora do dia'}, tickvals:Array.from({length:12},(_,i)=>i*2)},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:'Hora do dia'}, tickvals:Array.from({length:12},(_,i)=>i*2)},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2421,12 +2565,12 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     const groups = monthlyBoxplot(rows);
     const refs = exportRefShapes(cfg);
     return {
-      traces:groups.labels.map((label,i)=>({y:groups.values[i], type:'box', name:label, marker:{color:cfg.cor, size:3, opacity:0.5},
-        line:{color:cfg.cor}, fillcolor:cfg.corClara, boxmean:true})),
+      traces:groups.labels.map((label,i)=>({y:groups.values[i], type:'box', name:label, marker:{color:CHART_MAIN_COLOR, size:3, opacity:0.5},
+        line:{color:CHART_MAIN_COLOR}, fillcolor:CHART_FILL_COLOR, boxmean:true})),
       layout:exportLayout(`Boxplot Mensal - ${cfg.nome}`, width, height, {
         shapes:refs.shapes, annotations:refs.annotations, showlegend:false,
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF'},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:unitTitle}},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:unitTitle}},
       })
     };
   }
@@ -2445,13 +2589,13 @@ function exportChartSpec(kind, rows, cfg, width=900, height=560, ctx=null) {
     }
     return {
       traces:[
-        {x:ex.labels, y:ex.percents, type:'bar', name:`% acima de ${ex.limit.label}`, marker:{color:ex.limit.color}},
-        {x:ex.labels, y:ex.counts, type:'scatter', mode:'lines+markers', name:'N de excedências', yaxis:'y2', line:{color:'#111827', width:2}, marker:{size:5}},
+        {x:ex.labels, y:ex.percents, type:'bar', name:`% acima de ${ex.limit.label}`, marker:{color:CHART_MAIN_COLOR}},
+        {x:ex.labels, y:ex.counts, type:'scatter', mode:'lines+markers', name:'N de excedências', yaxis:'y2', line:{color:CHART_MEDIAN_COLOR, width:2}, marker:{size:5}},
       ],
       layout:exportLayout(`Excedências - ${cfg.nome}`, width, height, {
-        xaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', tickangle:-45, title:{text:'Dia'}},
-        yaxis:{gridcolor:'#E5E7EB', linecolor:'#9CA3AF', title:{text:'% acima do limite'}},
-        yaxis2:{overlaying:'y', side:'right', title:{text:'N'}, gridcolor:'rgba(0,0,0,0)', linecolor:'#9CA3AF'},
+        xaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, tickangle:-45, title:{text:'Dia'}},
+        yaxis:{gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, title:{text:'% acima do limite'}},
+        yaxis2:{overlaying:'y', side:'right', title:{text:'N'}, gridcolor:'rgba(0,0,0,0)', linecolor:CHART_AXIS_COLOR},
       })
     };
   }
@@ -2502,12 +2646,12 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
   const panelId = `panel-${col.replace(/\./g,'_')}`;
   const ts  = `ts-${col.replace(/\./g,'_')}`;
   const dp  = `dp-${col.replace(/\./g,'_')}`;
-  const qq  = `qq-${col.replace(/\./g,'_')}`;
+  const hist = `hist-${col.replace(/\./g,'_')}`;
   const bp  = `bp-${col.replace(/\./g,'_')}`;
   const slug = col.toLowerCase().replace(/\./g,'-');
   const ctx = { col, cfg, rows, analysisRows, vals, slug, totalRows, sourceLabel:CURRENT_DATASET.sourceLabel,
     outlierInfo, statBase:readAnalysisSettings().statBase,
-    chartIds:{timeSeries:ts, diurnal:dp, qq, weekdayBoxplot:bp} };
+    chartIds:{timeSeries:ts, diurnal:dp, histogram:hist, weekdayBoxplot:bp} };
   EXPORT_CONTEXTS[col] = ctx;
 
   const refText = cfg.refs.length
@@ -2516,6 +2660,7 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
   const advancedStats = buildAdvancedStatsHtml(ctx);
   const summaryHtml = automaticSummaryHtml(col, cfg, analysisRows, rows, outlierInfo);
   const comparisonHtml = buildComparisonHtml(analysisRows, cfg);
+  const sensorComparisonHtml = buildSensorComparisonHtml(col, cfg);
   const explainerHtml = buildGraphExplainerHtml(analysisRows, rows, cfg);
 
   const container = document.getElementById('panels-container');
@@ -2537,6 +2682,7 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
       <div class="analysis-note">${summaryHtml}</div>
       ${comparisonHtml}
     </div>
+    ${sensorComparisonHtml}
     <div class="chart-card charts-grid-top">
       <div class="chart-topbar">
         <div class="chart-title">SÉRIE TEMPORAL — ${cfg.nome} (${cfg.unidade})</div>
@@ -2554,14 +2700,14 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
       </div>
       <div class="chart-card">
         <div class="chart-topbar">
-          <div class="chart-title">Q-Q PLOT — NORMALIDADE</div>
-          <button class="chart-download" onclick="downloadChart('${qq}','${slug}-qqplot')">⬇ Baixar PNG</button>
+          <div class="chart-title">HISTOGRAMA DE FREQUÊNCIAS</div>
+          <button class="chart-download" onclick="downloadChart('${hist}','${slug}-histograma-frequencias')">⬇ Baixar PNG</button>
         </div>
-        <div id="${qq}"></div>
+        <div id="${hist}"></div>
       </div>
       <div class="chart-card">
         <div class="chart-topbar">
-          <div class="chart-title">BOXPLOT POR DIA DA SEMANA</div>
+          <div class="chart-title">COMPORTAMENTO POR DIA DA SEMANA</div>
           <button class="chart-download" onclick="downloadChart('${bp}','${slug}-boxplot-semanal')">⬇ Baixar PNG</button>
         </div>
         <div id="${bp}"></div>
@@ -2574,7 +2720,7 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
   requestAnimationFrame(()=>{
     buildTimeSeries(ts, rows, cfg);
     buildDiurnal(dp, rows, cfg);
-    buildQQ(qq, vals, cfg);
+    buildHistogram(hist, vals, cfg);
     buildBoxplot(bp, analysisRows, cfg);
   });
 
@@ -2590,7 +2736,7 @@ function resizeActivePanelCharts() {
   const active = document.querySelector('.panel.active');
   if (!active) return;
 
-  active.querySelectorAll('[id^="ts-"], [id^="dp-"], [id^="qq-"], [id^="bp-"]').forEach(el => {
+  active.querySelectorAll('[id^="ts-"], [id^="dp-"], [id^="hist-"], [id^="bp-"]').forEach(el => {
     try {
       Plotly.Plots.resize(el);
     } catch (e) {}
@@ -2758,14 +2904,10 @@ async function renderSpecToImage(spec, width, height) {
 
 async function createCompleteReportImage(ctx) {
   const chartJobs = [
-    ['timeSeries', 1620, 330],
-    ['histogram', 520, 300],
-    ['dailyBoxplot', 520, 300],
-    ['diurnal', 520, 300],
-    ['dailyVariability', 1050, 320],
-    ['qq', 520, 320],
-    ['heatmap', 790, 290],
-    ['weekdayProfile', 790, 290],
+    ['timeSeries', 1660, 340],
+    ['diurnal', 520, 330],
+    ['histogram', 520, 330],
+    ['weekdayBoxplot', 520, 330],
   ];
   const chartUrls = {};
   for (const [kind, width, height] of chartJobs) {
@@ -2774,33 +2916,15 @@ async function createCompleteReportImage(ctx) {
 
   const canvas = document.createElement('canvas');
   canvas.width = 1800;
-  canvas.height = 1600;
+  canvas.height = 900;
   const c = canvas.getContext('2d');
   c.fillStyle = '#FFFFFF';
   c.fillRect(0, 0, canvas.width, canvas.height);
 
-  const period = exportPeriodLabel(ctx.rows);
-  c.fillStyle = '#111827';
-  c.textAlign = 'center';
-  c.font = '700 26px Arial, sans-serif';
-  c.fillText(`Análise Estatística Completa - ${ctx.cfg.nome}`, 900, 34);
-  c.font = '700 20px Arial, sans-serif';
-  c.fillText(period, 900, 60);
-
-  drawSummaryStrip(c, ctx, 80, 82, 1640, 72);
-  await drawDataUrl(c, chartUrls.timeSeries, 90, 170, 1620, 330);
-  await drawDataUrl(c, chartUrls.histogram, 90, 535, 520, 300);
-  await drawDataUrl(c, chartUrls.dailyBoxplot, 640, 535, 520, 300);
-  await drawDataUrl(c, chartUrls.diurnal, 1190, 535, 520, 300);
-  await drawDataUrl(c, chartUrls.dailyVariability, 90, 870, 1050, 320);
-  await drawDataUrl(c, chartUrls.qq, 1190, 870, 520, 320);
-  await drawDataUrl(c, chartUrls.heatmap, 90, 1225, 790, 290);
-  await drawDataUrl(c, chartUrls.weekdayProfile, 920, 1225, 790, 290);
-
-  c.fillStyle = '#6B7280';
-  c.textAlign = 'right';
-  c.font = '12px Arial, sans-serif';
-  c.fillText(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 1710, 1588);
+  await drawDataUrl(c, chartUrls.timeSeries, 70, 26, 1660, 340);
+  await drawDataUrl(c, chartUrls.diurnal, 70, 500, 520, 330);
+  await drawDataUrl(c, chartUrls.histogram, 640, 500, 520, 330);
+  await drawDataUrl(c, chartUrls.weekdayBoxplot, 1210, 500, 520, 330);
   return canvas.toDataURL('image/png');
 }
 
@@ -3034,38 +3158,144 @@ function renderRows(rows, sourceLabel) {
   hideLoading();
 }
 
+const DEFAULT_ISEQ_EQUIPMENT = {
+  mac:'1C:69:20:C7:31:D8',
+  location:'Sensor 1 padrão',
+  label:'Sensor 1 padrão (1C:69:20:C7:31:D8)'
+};
+let ISEQ_EQUIPMENT = [DEFAULT_ISEQ_EQUIPMENT];
+
+function normalizeMac(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function equipmentLabel(item, fallback='Sensor') {
+  if(!item) return fallback;
+  return item.location || item.label || item.mac || fallback;
+}
+
+function normalizeEquipmentList(items) {
+  const map = new Map();
+  (items || []).forEach(item => {
+    const mac = normalizeMac(item.mac);
+    if(!mac || map.has(mac)) return;
+    const location = String(item.location || item.nomeExibicao || item.ambiente || item.label || mac).trim();
+    map.set(mac, {
+      mac,
+      location,
+      label: location && location !== mac ? `${location} (${mac})` : mac,
+    });
+  });
+  if(!map.size) map.set(DEFAULT_ISEQ_EQUIPMENT.mac, DEFAULT_ISEQ_EQUIPMENT);
+  return [...map.values()].sort((a,b) => equipmentLabel(a).localeCompare(equipmentLabel(b), 'pt-BR'));
+}
+
+function populateIseqEnvironmentSelects(items) {
+  const env1 = document.getElementById('environment-1');
+  const env2 = document.getElementById('environment-2');
+  if(!env1 || !env2) return;
+
+  const previous1 = normalizeMac(env1.value || localStorage.getItem('iseqEnvironment1') || DEFAULT_ISEQ_EQUIPMENT.mac);
+  const previous2 = normalizeMac(env2.value || localStorage.getItem('iseqEnvironment2') || '');
+  ISEQ_EQUIPMENT = normalizeEquipmentList(items);
+
+  const options = ISEQ_EQUIPMENT.map(item => `<option value="${item.mac}">${item.label}</option>`).join('');
+  env1.innerHTML = options;
+  env2.innerHTML = `<option value="">Sem comparação</option>${options}`;
+
+  const macs = new Set(ISEQ_EQUIPMENT.map(item => item.mac));
+  env1.value = macs.has(previous1) ? previous1 : ISEQ_EQUIPMENT[0]?.mac || '';
+  const firstOther = ISEQ_EQUIPMENT.find(item => item.mac !== env1.value)?.mac || '';
+  env2.value = previous2 && macs.has(previous2) && previous2 !== env1.value
+    ? previous2
+    : firstOther;
+}
+
+function selectedIseqEnvironment(selectId, fallbackLabel) {
+  const select = document.getElementById(selectId);
+  const mac = normalizeMac(select?.value || '');
+  if(!mac) return null;
+  const found = ISEQ_EQUIPMENT.find(item => item.mac === mac);
+  return {
+    equipmentId: mac,
+    label: equipmentLabel(found, fallbackLabel),
+  };
+}
+
+async function loadIseqEnvironments(options={}) {
+  const {silent=false} = options;
+  const backendUrl = getBackendUrl();
+  try {
+    const payload = await fetchJson(`${backendUrl}/api/iseq/equipment`);
+    const equipment = Array.isArray(payload.equipment) ? payload.equipment : [];
+    populateIseqEnvironmentSelects(equipment);
+    if(!silent) {
+      setIseqStatus(`${ISEQ_EQUIPMENT.length} ambiente(s) carregado(s).`, 'done');
+    }
+  } catch(err) {
+    populateIseqEnvironmentSelects(ISEQ_EQUIPMENT);
+    if(!silent) {
+      setIseqStatus(`Não foi possível carregar ambientes: ${err.message}`, 'error');
+    }
+  }
+}
+
 async function startIseqJob(event) {
   event.preventDefault();
   const backendUrl = getBackendUrl();
-  const equipmentId = document.getElementById('equipment-id').value.trim();
+  const env1 = selectedIseqEnvironment('environment-1', 'Sensor 1');
+  const env2 = selectedIseqEnvironment('environment-2', 'Sensor 2');
   const start = normalizeInputDate(document.getElementById('start-date').value);
   const end = normalizeInputDate(document.getElementById('end-date').value);
   const workers = Number(document.getElementById('job-workers')?.value || 6);
 
-  if(!equipmentId || !start || !end) {
-    setIseqStatus('Preencha equipamento, início e fim.', 'error');
+  if(!env1 || !start || !end) {
+    setIseqStatus('Selecione Ambiente 1, início e fim.', 'error');
     return;
   }
 
   localStorage.setItem('iseqBackendUrl', backendUrl);
+  localStorage.setItem('iseqEnvironment1', env1.equipmentId);
+  localStorage.setItem('iseqEnvironment2', env2?.equipmentId || '');
   setIseqProgress({status:'queued', total_tasks:0, completed_tasks:0, message:'Criando tarefa no backend...'});
 
   try {
-    const created = await fetchJson(`${backendUrl}/api/iseq/jobs`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({equipment_id:equipmentId, start, end, workers})
-    });
-    await pollIseqJob(backendUrl, created.id);
+    const sensors = [{...env1, key:'S1'}];
+    if(env2 && env2.equipmentId !== env1.equipmentId) {
+      sensors.push({...env2, key:'S2'});
+    }
+    const workersPerSensor = sensors.length > 1
+      ? Math.max(1, Math.floor(workers / sensors.length))
+      : workers;
+    const rowGroups = await Promise.all(sensors.map(sensor =>
+      fetchIseqRowsForSensor(backendUrl, sensor.equipmentId, start, end, workersPerSensor, sensor.key, sensor.label)
+    ));
+    const rows = rowGroups.flat();
+    const sourceLabel = sensors.length > 1
+      ? `ISEQ backend · ${sensors.length} sensores · ${start} a ${end}`
+      : `ISEQ backend · ${sensors[0].equipmentId}`;
+    renderRows(rows, sourceLabel);
   } catch(err) {
     setIseqStatus(`Falha ao iniciar: ${err.message}`, 'error');
   }
 }
 
-async function pollIseqJob(backendUrl, jobId) {
+async function fetchIseqRowsForSensor(backendUrl, equipmentId, start, end, workers, sensorKey, sensorLabel) {
+  setIseqProgress({status:'queued', total_tasks:0, completed_tasks:0, message:`Criando tarefa: ${sensorLabel}...`});
+  const created = await fetchJson(`${backendUrl}/api/iseq/jobs`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({equipment_id:equipmentId, start, end, workers})
+  });
+  const rows = await pollIseqJob(backendUrl, created.id, sensorLabel);
+  return tagSensorRows(rows, sensorKey, sensorLabel, equipmentId);
+}
+
+async function pollIseqJob(backendUrl, jobId, sensorLabel='Sensor') {
   let job = null;
   while(true) {
     job = await fetchJson(`${backendUrl}/api/iseq/jobs/${jobId}`);
+    job = {...job, message:`${sensorLabel}: ${job.message || ''}`};
     setIseqProgress(job);
 
     if(job.status === 'completed') break;
@@ -3079,8 +3309,7 @@ async function pollIseqJob(backendUrl, jobId) {
 
   showLoading('Baixando dados normalizados…');
   const payload = await fetchJson(`${backendUrl}/api/iseq/jobs/${jobId}/data`);
-  const rows = normalizeCombinedRows((payload.rows || []).map(r => ({...r, _dt:parseLocalDate(r.data_local)})));
-  renderRows(rows, `ISEQ backend · job ${jobId}`);
+  return normalizeCombinedRows((payload.rows || []).map(r => ({...r, _dt:parseLocalDate(r.data_local)})));
 }
 
 function normalizeInputDate(value) {
@@ -3172,6 +3401,14 @@ function showToast(msg, dur=5000) {
 
 document.getElementById('backend-url').value = DEFAULT_BACKEND_URL;
 document.getElementById('iseq-form').addEventListener('submit', startIseqJob);
+document.getElementById('environment-1')?.addEventListener('change', () => {
+  const env1 = document.getElementById('environment-1');
+  const env2 = document.getElementById('environment-2');
+  if(env1 && env2 && env2.value === env1.value) {
+    env2.value = ISEQ_EQUIPMENT.find(item => item.mac !== env1.value)?.mac || '';
+  }
+});
+loadIseqEnvironments({silent:true});
 
 // Drag-and-drop
 const dropZone = document.getElementById('drop-zone');

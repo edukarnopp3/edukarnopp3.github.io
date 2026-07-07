@@ -108,6 +108,9 @@ class JobStore:
             return []
         return json.loads(data_path.read_text(encoding="utf-8"))
 
+    def list_equipment(self) -> list[dict[str, str]]:
+        return self.collector.list_equipment()
+
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs[job_id]

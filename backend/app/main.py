@@ -44,6 +44,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/iseq/equipment")
+def list_equipment() -> dict[str, object]:
+    return {"equipment": store.list_equipment()}
+
+
 @app.post("/api/iseq/jobs")
 def create_job(payload: JobRequest) -> dict[str, object]:
     if payload.end <= payload.start:

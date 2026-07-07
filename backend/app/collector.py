@@ -31,6 +31,9 @@ class IseqCollector:
     def preflight(self) -> None:
         return None
 
+    def list_equipment(self) -> list[dict[str, str]]:
+        return []
+
     def fetch_export(self, task: ExportTask, destination_dir: Path) -> Path:
         raise NotImplementedError
 
@@ -135,6 +138,30 @@ class ApiReportCollector(IseqCollector):
     def _list_reports(self) -> list[dict[str, object]]:
         payload = self._request_json("reports")
         return payload if isinstance(payload, list) else []
+
+    def list_equipment(self) -> list[dict[str, str]]:
+        payload = self._request_json("equipment")
+        if not isinstance(payload, list):
+            return []
+        equipment = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            mac = str(item.get("mac") or "").strip()
+            if not mac:
+                continue
+            location = str(
+                item.get("location")
+                or item.get("nomeExibicao")
+                or item.get("ambiente")
+                or mac
+            ).strip()
+            equipment.append({
+                "mac": mac,
+                "location": location,
+                "label": f"{location} ({mac})" if location != mac else mac,
+            })
+        return equipment
 
     def _matches_task(self, report: dict[str, object], task: ExportTask) -> bool:
         parameter = normalize_parameter(report.get("parametro"))

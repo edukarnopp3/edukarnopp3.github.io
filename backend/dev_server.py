@@ -35,6 +35,13 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(200, {"status": "ok", "collector_mode": mode, "collector_dir": os.getenv("ISEQ_EXPORT_DIR", "")})
             return
 
+        if path == "/api/iseq/equipment":
+            try:
+                self.respond(200, {"equipment": store.list_equipment()})
+            except Exception as exc:
+                self.respond(400, {"detail": str(exc)})
+            return
+
         if path.startswith("/api/iseq/jobs/"):
             parts = path.strip("/").split("/")
             if len(parts) == 4:
