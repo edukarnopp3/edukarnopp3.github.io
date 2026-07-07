@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 from pathlib import Path
 import sys
@@ -10,6 +11,14 @@ LOGIN_URL = "https://sensores.iseq.com.br/login"
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Login assistido no ISEQ.")
+    parser.add_argument(
+        "--print-token",
+        action="store_true",
+        help="Imprime o token capturado para configurar ISEQ_BEARER_TOKEN em um backend hospedado.",
+    )
+    args = parser.parse_args()
+
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -20,7 +29,10 @@ def main() -> int:
         return 1
 
     print("Abrindo janela de login do ISEQ...")
-    print("Faca login normalmente. O token sera usado so nesta execucao e nao sera impresso.")
+    if args.print_token:
+        print("Faca login normalmente. O token sera impresso uma unica vez para voce copiar ao Render.")
+    else:
+        print("Faca login normalmente. O token sera usado so nesta execucao e nao sera impresso.")
 
     with sync_playwright() as playwright:
         user_data_dir = Path(__file__).resolve().parent / ".browser-profile"
@@ -41,6 +53,12 @@ def main() -> int:
     if not token:
         print("Nao encontrei token. Tente fazer login novamente e aguardar o dashboard abrir.")
         return 1
+
+    if args.print_token:
+        print("\nISEQ_BEARER_TOKEN:")
+        print(token)
+        print("\nCole esse valor nas Environment Variables do Render. Nao salve no GitHub.")
+        return 0
 
     os.environ["ISEQ_BEARER_TOKEN"] = token
     os.environ.setdefault("ISEQ_STORAGE_DIR", str(Path(__file__).resolve().parent / "storage"))

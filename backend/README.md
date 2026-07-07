@@ -60,6 +60,13 @@ Para ativar esse fluxo:
 ISEQ_BEARER_TOKEN=COLE_SEU_TOKEN_AQUI
 ```
 
+Para gerar esse token manualmente:
+
+```powershell
+cd backend
+python login_and_run.py --print-token
+```
+
 Nao salve esse token no GitHub. Ele deve ficar apenas nas Environment Variables do Render.
 
 Se a ISEQ recusar a busca com erro 401/403, o token expirou. Gere um token novo com login local e atualize `ISEQ_BEARER_TOKEN` no Render.
