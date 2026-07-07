@@ -265,16 +265,16 @@
 
   .insight-dashboard {
     display: grid;
-    grid-template-columns: repeat(4, minmax(180px, 1fr));
-    gap: 14px;
-    margin-bottom: 18px;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
   }
   .insight-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
-    min-height: 106px;
+    padding: 14px 16px;
+    min-height: 92px;
   }
   .insight-card .label {
     color: var(--muted);
@@ -293,9 +293,9 @@
   }
   .insight-card .sub {
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.35;
-    margin-top: 8px;
+    margin-top: 6px;
   }
 
   .analysis-controls {
@@ -371,6 +371,9 @@
     gap: 12px;
     margin: 0 0 18px;
   }
+  .analysis-note-grid-single {
+    grid-template-columns: 1fr;
+  }
   .analysis-note,
   .comparison-card,
   .chart-explainer {
@@ -422,6 +425,9 @@
   .sensor-comparison-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
+  .sensor-comparison-extra {
+    margin-top: 10px;
+  }
   .sensor-comparison-note {
     color: var(--muted);
     margin: 8px 0 0;
@@ -454,7 +460,6 @@
   }
   body.presentation-mode .badge,
   body.presentation-mode .chart-download,
-  body.presentation-mode .global-export-tools,
   body.presentation-mode .footer-actions {
     display: none;
   }
@@ -551,13 +556,6 @@
     padding: 16px;
     margin: 18px 0;
   }
-  .global-export-tools {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin: 18px 0 22px;
-  }
   .export-tools-head {
     display: flex;
     align-items: center;
@@ -600,7 +598,43 @@
     display: grid;
     grid-template-columns: repeat(6, minmax(120px, 1fr));
     gap: 8px;
+    margin: 10px 0 0;
+  }
+  .advanced-stats-details {
+    background: rgba(28,35,51,0.55);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     margin: -6px 0 18px;
+    padding: 0;
+  }
+  .advanced-stats-details summary {
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    list-style: none;
+    padding: 11px 14px;
+    text-transform: uppercase;
+  }
+  .advanced-stats-details summary::-webkit-details-marker {
+    display: none;
+  }
+  .advanced-stats-details summary::after {
+    content: '+';
+    float: right;
+    color: var(--accent);
+  }
+  .advanced-stats-details[open] {
+    padding: 0 12px 12px;
+  }
+  .advanced-stats-details[open] summary {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .advanced-stats-details[open] summary::after {
+    content: '-';
   }
   .metric-chip {
     background: rgba(33, 40, 56, 0.7);
@@ -713,7 +747,7 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.6</span>
+    <span class="badge">v2.7</span>
     <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
       📂 Novo arquivo
       <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
@@ -863,28 +897,13 @@
       <div class="param-filter-grid" id="param-filters"></div>
       <div class="control-actions">
         <label class="check-pill"><input type="checkbox" id="presentation-mode"/> Modo defesa</label>
-        <label class="check-pill"><input type="checkbox" id="graph-notes" checked/> Explicar graficos</label>
+        <label class="check-pill"><input type="checkbox" id="graph-notes"/> Explicar graficos</label>
         <div class="action-group">
           <button class="btn btn-outline" type="button" onclick="resetAnalysisFilters()">Resetar filtros</button>
           <button class="btn btn-outline" type="button" onclick="downloadNormalizedCsv()">Baixar CSV</button>
           <button class="btn btn-outline" type="button" onclick="downloadNormalizedXlsx()">Baixar XLSX</button>
         </div>
       </div>
-    </div>
-
-    <div class="global-export-tools" id="global-export-tools">
-      <div class="export-tools-head">
-        <div>
-          <div class="export-tools-title">Relatório offline</div>
-          <span class="info-text">Gere a imagem final completa do parâmetro atual ou um pacote com todos os parâmetros carregados.</span>
-        </div>
-        <div class="export-buttons">
-          <button class="btn btn-outline" type="button" onclick="downloadCurrentCompleteReport()">⬇ Imagem final atual</button>
-          <button class="btn btn-outline" type="button" onclick="exportCurrentStatsPackage()">⬇ Pacote atual</button>
-          <button class="btn" type="button" onclick="exportAllStatsPackage()">⬇ Todos os parâmetros</button>
-        </div>
-      </div>
-      <div class="export-options" id="global-export-options"></div>
     </div>
 
     <!-- Tabs -->
@@ -947,7 +966,7 @@ const PLOT_LAYOUT_BASE = {
 };
 const PLOT_CONFIG = {
   responsive: true,
-  displayModeBar: true,
+  displayModeBar: false,
   scrollZoom: true,
   displaylogo: false
 };
@@ -1641,28 +1660,12 @@ function buildSensorComparisonHtml(col, cfg, comp=null, chartIds={}) {
             <div class="val">${st.n.toLocaleString('pt-BR')}</div>
           </div>
           <div class="comparison-cell">
-            <div class="lbl">Cobertura pareada</div>
-            <div class="val">${coverageText}</div>
-          </div>
-          <div class="comparison-cell">
-            <div class="lbl">Media ${s1.label}</div>
-            <div class="val">${fmt(st.mean1)} ${cfg.unidade}</div>
-          </div>
-          <div class="comparison-cell">
-            <div class="lbl">Media ${s2.label}</div>
-            <div class="val">${fmt(st.mean2)} ${cfg.unidade}</div>
-          </div>
-          <div class="comparison-cell">
             <div class="lbl">Vies medio S2-S1</div>
             <div class="val">${fmtSigned(st.meanDiff)} ${cfg.unidade}</div>
           </div>
           <div class="comparison-cell">
             <div class="lbl">Diferenca relativa</div>
             <div class="val">${pctText}</div>
-          </div>
-          <div class="comparison-cell">
-            <div class="lbl">Diferenca relativa abs.</div>
-            <div class="val">${absPctText}</div>
           </div>
           <div class="comparison-cell">
             <div class="lbl">MAE</div>
@@ -1673,26 +1676,47 @@ function buildSensorComparisonHtml(col, cfg, comp=null, chartIds={}) {
             <div class="val">${fmt(st.rmse)} ${cfg.unidade}</div>
           </div>
           <div class="comparison-cell">
-            <div class="lbl">NRMSE</div>
-            <div class="val">${nrmseText}</div>
-          </div>
-          <div class="comparison-cell">
             <div class="lbl">R / R2</div>
             <div class="val">${rText} / ${r2Text}</div>
-          </div>
-          <div class="comparison-cell">
-            <div class="lbl">Regressao</div>
-            <div class="val">b=${slopeText}; a=${interceptText}</div>
           </div>
           <div class="comparison-cell">
             <div class="lbl">Bland-Altman 95%</div>
             <div class="val">${fmtSigned(st.loaLow)} a ${fmtSigned(st.loaHigh)} ${cfg.unidade}</div>
           </div>
-          <div class="comparison-cell">
-            <div class="lbl">Maior diferenca abs.</div>
-            <div class="val">${fmt(st.maxAbsDiff)} ${cfg.unidade}</div>
-          </div>
         </div>
+        <details class="advanced-stats-details sensor-comparison-extra">
+          <summary>Mais metricas dos sensores</summary>
+          <div class="comparison-table sensor-comparison-grid">
+            <div class="comparison-cell">
+              <div class="lbl">Cobertura pareada</div>
+              <div class="val">${coverageText}</div>
+            </div>
+            <div class="comparison-cell">
+              <div class="lbl">Media ${s1.label}</div>
+              <div class="val">${fmt(st.mean1)} ${cfg.unidade}</div>
+            </div>
+            <div class="comparison-cell">
+              <div class="lbl">Media ${s2.label}</div>
+              <div class="val">${fmt(st.mean2)} ${cfg.unidade}</div>
+            </div>
+            <div class="comparison-cell">
+              <div class="lbl">Diferenca relativa abs.</div>
+              <div class="val">${absPctText}</div>
+            </div>
+            <div class="comparison-cell">
+              <div class="lbl">NRMSE</div>
+              <div class="val">${nrmseText}</div>
+            </div>
+            <div class="comparison-cell">
+              <div class="lbl">Regressao</div>
+              <div class="val">b=${slopeText}; a=${interceptText}</div>
+            </div>
+            <div class="comparison-cell">
+              <div class="lbl">Maior diferenca abs.</div>
+              <div class="val">${fmt(st.maxAbsDiff)} ${cfg.unidade}</div>
+            </div>
+          </div>
+        </details>
         <p class="sensor-comparison-note">Diferenca relativa usa a media dos dois sensores como base. Para temperatura em Celsius, o percentual e omitido; a diferenca em graus e a metrica mais adequada.</p>
       </div>
       ${charts}
@@ -1728,7 +1752,7 @@ function setupAnalysisControls(rows, dMin, dMax, availParams) {
   if(statBase) statBase.value = 'instant';
   if(outlierMode) outlierMode.value = 'none';
   if(comparisonMode) comparisonMode.value = 'none';
-  if(graphNotes) graphNotes.checked = true;
+  if(graphNotes) graphNotes.checked = false;
   if(presentation) presentation.checked = false;
   document.body.classList.remove('presentation-mode');
 
@@ -1952,14 +1976,6 @@ function buildInsightDashboard(rows, params) {
     return;
   }
 
-  const range = minMax(rows.map(r => r._dt));
-  const dMin = range ? new Date(range.min) : null;
-  const dMax = range ? new Date(range.max) : null;
-  const period = dMin && dMax ? `${fmtDate(dMin)} - ${fmtDate(dMax)}` : '-';
-  const coverage = params.length
-    ? mean(params.map(([col, cfg]) => filterParam(rows, col, cfg).length / rows.length))
-    : 0;
-
   let peak = null;
   params.forEach(([col, cfg]) => {
     const pRows = filterParam(rows, col, cfg);
@@ -2004,10 +2020,9 @@ function buildInsightDashboard(rows, params) {
     : 'Carregue pares como CO2/VOC, PM2.5/PM10 ou Temp/Umid.';
 
   root.innerHTML = [
-    buildInsightCard('Periodo filtrado', period, `${rows.length.toLocaleString('pt-BR')} registros brutos no recorte`),
-    buildInsightCard('Cobertura media', `${(coverage * 100).toFixed(1)}%`, `${params.length} parametro(s) selecionado(s)`),
     buildInsightCard('Principal pico', peak ? `${peak.cfg.nome}: ${fmt(peak.row.v)} ${peak.cfg.unidade}` : 'Sem pico', peak ? fmtDateTime(peak.row.dt) : 'Sem leituras validas'),
-    buildInsightCard('Alertas e correlacao', alertText, `${alertSub}<br>${corrText} (${corrSub})`),
+    buildInsightCard('Alertas', alertText, alertSub),
+    buildInsightCard('Correlacao', corrText, corrSub),
   ].join('');
 }
 
@@ -2047,12 +2062,7 @@ function automaticSummaryHtml(col, cfg, analysisRows, instantRows, outlierInfo) 
 function buildComparisonHtml(rows, cfg) {
   const settings = readAnalysisSettings();
   if(settings.comparisonMode === 'none') {
-    return `
-      <div class="comparison-card">
-        <div class="title">Comparacao entre periodos</div>
-        <p>Selecione um modo de comparacao para ver antes/depois ou dias uteis vs fim de semana.</p>
-      </div>
-    `;
+    return '';
   }
 
   let a = [];
@@ -2162,7 +2172,8 @@ function renderCurrentView(options={}) {
   const coverages = params.map(([k,cfg]) => rows.length ? filterParam(rows, k, cfg).length / rows.length : 0);
   document.getElementById('stat-coverage').textContent = `${(mean(coverages) * 100 || 0).toFixed(1)}%`;
   document.getElementById('file-info').textContent = `${CURRENT_DATASET.sourceLabel} | ${rows.length.toLocaleString('pt-BR')} registros no filtro`;
-  document.getElementById('global-export-options').innerHTML = buildExportOptionsHtml('global');
+  const globalExportOptions = document.getElementById('global-export-options');
+  if(globalExportOptions) globalExportOptions.innerHTML = buildExportOptionsHtml('global');
 
   const tabsHeader = document.getElementById('tabs-header');
   const container = document.getElementById('panels-container');
@@ -2878,6 +2889,7 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
   const advancedStats = buildAdvancedStatsHtml(ctx);
   const summaryHtml = automaticSummaryHtml(col, cfg, analysisRows, rows, outlierInfo);
   const comparisonHtml = buildComparisonHtml(analysisRows, cfg);
+  const notesClass = comparisonHtml ? 'analysis-note-grid' : 'analysis-note-grid analysis-note-grid-single';
   const sensorComparison = sensorComparisonForParam(col, cfg);
   const sensorComparisonHtml = buildSensorComparisonHtml(col, cfg, sensorComparison, {
     time:sensorTime,
@@ -2899,9 +2911,12 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
       <div class="pstat"><div class="lbl">Mín → Máx</div><div class="val" style="font-size:12px">${fmt(st.min)} → ${fmt(st.max)}</div></div>
       <div class="pstat"><div class="lbl">P95</div><div class="val">${fmt(st.p95)}</div></div>
     </div>
-    <div class="advanced-stats-grid">${advancedStats}</div>
+    <details class="advanced-stats-details">
+      <summary>Métricas avançadas</summary>
+      <div class="advanced-stats-grid">${advancedStats}</div>
+    </details>
     ${refText}
-    <div class="analysis-note-grid">
+    <div class="${notesClass}">
       <div class="analysis-note">${summaryHtml}</div>
       ${comparisonHtml}
     </div>
@@ -3327,7 +3342,8 @@ function renderRows(rows, sourceLabel) {
   const avgCov = mean(coverages);
   document.getElementById('stat-coverage').textContent = `${(avgCov*100).toFixed(1)}%`;
   document.getElementById('file-info').textContent = sourceLabel;
-  document.getElementById('global-export-options').innerHTML = buildExportOptionsHtml('global');
+  const globalExportOptions = document.getElementById('global-export-options');
+  if(globalExportOptions) globalExportOptions.innerHTML = buildExportOptionsHtml('global');
 
   document.getElementById('tabs-header').innerHTML='';
   document.getElementById('panels-container').innerHTML='';
