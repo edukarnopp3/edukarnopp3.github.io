@@ -33,6 +33,7 @@ def main() -> int:
         )
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(LOGIN_URL)
+        clear_stale_token(page)
 
         token = wait_for_token(page)
         context.close()
@@ -53,6 +54,24 @@ def main() -> int:
     print("Deixe esta janela aberta enquanto usa o painel.")
     ThreadingHTTPServer((host, port), Handler).serve_forever()
     return 0
+
+
+def clear_stale_token(page) -> None:
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+    except Exception:
+        pass
+    try:
+        page.evaluate(
+            "() => { localStorage.removeItem('token'); sessionStorage.removeItem('token'); }"
+        )
+        print("Token local antigo removido. Faca login novamente se a tela pedir.")
+    except Exception:
+        pass
+    try:
+        page.reload(wait_until="domcontentloaded")
+    except Exception:
+        pass
 
 
 def wait_for_token(page) -> str | None:
