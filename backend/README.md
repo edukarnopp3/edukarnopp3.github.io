@@ -58,6 +58,7 @@ Para ativar esse fluxo:
 
 ```text
 ISEQ_BEARER_TOKEN=COLE_SEU_TOKEN_AQUI
+PYTHON_VERSION=3.11.11
 ```
 
 Para gerar esse token manualmente:

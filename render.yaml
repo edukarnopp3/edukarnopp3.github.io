@@ -15,3 +15,5 @@ services:
         value: "3"
       - key: ISEQ_CHUNK_DAYS
         value: "1"
+      - key: PYTHON_VERSION
+        value: "3.11.11"
