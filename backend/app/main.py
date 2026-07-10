@@ -46,7 +46,16 @@ def health() -> dict[str, str]:
 
 @app.get("/api/iseq/equipment")
 def list_equipment() -> dict[str, object]:
-    return {"equipment": store.list_equipment()}
+    try:
+        return {"equipment": store.list_equipment()}
+    except Exception as exc:
+        message = str(exc)
+        if "HTTP 401" in message or "HTTP 403" in message:
+            raise HTTPException(
+                status_code=401,
+                detail="Token ISEQ recusado ou expirado. Atualize ISEQ_BEARER_TOKEN no Render.",
+            ) from exc
+        raise HTTPException(status_code=502, detail=f"Falha ao consultar API ISEQ: {message}") from exc
 
 
 @app.post("/api/iseq/jobs")
