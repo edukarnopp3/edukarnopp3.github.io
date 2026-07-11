@@ -7,9 +7,10 @@ import json
 import os
 import threading
 import time
+from typing import Callable, Protocol
 import uuid
 
-from .collector import CollectorNotConfigured, ExportTask, build_collector, build_export_tasks
+from .collector import CollectorNotConfigured, ExportTask, IseqCollector, build_collector, build_export_tasks
 from .iseq_parser import parse_iseq_xlsx, records_to_wide_rows
 
 
@@ -45,6 +46,7 @@ class JobState:
     equipment_id: str
     start: str
     end: str
+    user_id: str = "legacy"
     status: str = "queued"
     created_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
@@ -58,21 +60,53 @@ class JobState:
     data_file: str | None = None
 
 
+class JobRepository(Protocol):
+    def save_import_job(self, state: dict[str, object]) -> None: ...
+    def load_import_job(self, job_id: str) -> dict[str, object] | None: ...
+    def save_readings(
+        self,
+        user_id: str,
+        equipment_id: str,
+        job_id: str,
+        rows: list[dict[str, object]],
+    ) -> None: ...
+    def get_readings(
+        self,
+        user_id: str,
+        equipment_id: str,
+        start: datetime,
+        end: datetime,
+    ) -> list[dict[str, object]]: ...
+
+
 class JobStore:
-    def __init__(self, storage_dir: str | os.PathLike[str] = "backend/storage"):
+    def __init__(
+        self,
+        storage_dir: str | os.PathLike[str] = "backend/storage",
+        collector_factory: Callable[[str], IseqCollector] | None = None,
+        repository: JobRepository | None = None,
+    ):
         self.storage_dir = Path(storage_dir)
         self.jobs_dir = self.storage_dir / "jobs"
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
         self.jobs: dict[str, JobState] = {}
         self.lock = threading.RLock()
-        self.collector = build_collector()
+        self.collector_factory = collector_factory or (lambda _user_id: build_collector())
+        self.repository = repository
         try:
             configured_workers = int(os.getenv("ISEQ_JOB_WORKERS", "6"))
         except ValueError:
             configured_workers = 6
         self.default_workers = self._normalize_worker_count(configured_workers)
 
-    def create_job(self, equipment_id: str, start: datetime, end: datetime, workers: object | None = None) -> JobState:
+    def create_job(
+        self,
+        equipment_id: str,
+        start: datetime,
+        end: datetime,
+        workers: object | None = None,
+        user_id: str = "legacy",
+    ) -> JobState:
         job_id = uuid.uuid4().hex[:12]
         export_tasks = build_export_tasks(equipment_id, start, end)
         job = JobState(
@@ -80,6 +114,7 @@ class JobStore:
             equipment_id=equipment_id,
             start=start.isoformat(timespec="seconds"),
             end=end.isoformat(timespec="seconds"),
+            user_id=user_id,
             total_tasks=len(export_tasks),
             worker_count=self._normalize_worker_count(workers),
             tasks=[self._task_to_state(task) for task in export_tasks],
@@ -101,15 +136,26 @@ class JobStore:
 
     def get_data(self, job_id: str) -> list[dict[str, object]]:
         job = self.get_job(job_id)
-        if not job or not job.data_file:
+        if not job:
+            return []
+        if self.repository and job.user_id != "legacy":
+            rows = self.repository.get_readings(
+                job.user_id,
+                job.equipment_id,
+                datetime.fromisoformat(job.start),
+                datetime.fromisoformat(job.end),
+            )
+            if rows:
+                return rows
+        if not job.data_file:
             return []
         data_path = Path(job.data_file)
         if not data_path.exists():
             return []
         return json.loads(data_path.read_text(encoding="utf-8"))
 
-    def list_equipment(self) -> list[dict[str, str]]:
-        return self.collector.list_equipment()
+    def list_equipment(self, user_id: str = "legacy") -> list[dict[str, str]]:
+        return self.collector_factory(user_id).list_equipment()
 
     def _run_job(self, job_id: str) -> None:
         with self.lock:
@@ -121,7 +167,18 @@ class JobStore:
             self._save_job(job)
 
         try:
-            self.collector.preflight()
+            collector = self.collector_factory(job.user_id)
+        except Exception as exc:
+            with self.lock:
+                job = self.jobs[job_id]
+                job.status = "failed"
+                job.message = str(exc)
+                job.updated_at = datetime.now().isoformat(timespec="seconds")
+                self._save_job(job)
+            return
+
+        try:
+            collector.preflight()
         except Exception as exc:
             stop_message = self._collector_stop_message(str(exc))
             if stop_message:
@@ -134,7 +191,7 @@ class JobStore:
                 return
 
         workers = [
-            threading.Thread(target=self._run_job_worker, args=(job_id,), daemon=True)
+            threading.Thread(target=self._run_job_worker, args=(job_id, collector), daemon=True)
             for _ in range(worker_count)
         ]
         for worker in workers:
@@ -149,9 +206,17 @@ class JobStore:
             job.message = "Combinando arquivos exportados."
             job.updated_at = datetime.now().isoformat(timespec="seconds")
             self._save_job(job)
-        self._finalize_job(job)
+        try:
+            self._finalize_job(job)
+        except Exception as exc:
+            with self.lock:
+                job = self.jobs[job_id]
+                job.status = "failed"
+                job.message = f"Falha ao salvar os dados importados: {exc}"
+                job.updated_at = datetime.now().isoformat(timespec="seconds")
+                self._save_job(job)
 
-    def _run_job_worker(self, job_id: str) -> None:
+    def _run_job_worker(self, job_id: str, collector: IseqCollector) -> None:
         while True:
             with self.lock:
                 job = self.jobs[job_id]
@@ -178,9 +243,9 @@ class JobStore:
             if pending is None:
                 time.sleep(sleep_seconds)
                 continue
-            self._run_task_once(job_id, pending)
+            self._run_task_once(job_id, pending, collector)
 
-    def _run_task_once(self, job_id: str, task: TaskState) -> None:
+    def _run_task_once(self, job_id: str, task: TaskState, collector: IseqCollector) -> None:
         with self.lock:
             job = self.jobs[job_id]
             job.status = "running"
@@ -195,7 +260,7 @@ class JobStore:
             self._save_job(job)
 
         try:
-            file_path = self.collector.fetch_export(self._state_to_task(task), self._job_export_dir(job_id))
+            file_path = collector.fetch_export(self._state_to_task(task), self._job_export_dir(job_id))
             with self.lock:
                 job = self.jobs[job_id]
                 task.status = "completed"
@@ -213,6 +278,19 @@ class JobStore:
             self._record_retry(job_id, task, exc)
 
     def _record_retry(self, job_id: str, task: TaskState, exc: Exception, configuration_block: bool = False) -> None:
+        if self._has_marker(str(exc), ISEQ_AUTH_MARKERS):
+            with self.lock:
+                job = self.jobs[job_id]
+                task.status = "failed"
+                task.last_error = str(exc)
+                task.next_retry_at = None
+                job.status = "failed"
+                job.failed_attempts += 1
+                self._refresh_counts(job)
+                job.message = self._iseq_auth_message()
+                job.updated_at = datetime.now().isoformat(timespec="seconds")
+                self._save_job(job)
+            return
         delay = MAX_RETRY_SECONDS if configuration_block else min(2 ** min(task.attempts, 8), MAX_RETRY_SECONDS)
         next_retry = datetime.fromtimestamp(time.time() + delay)
         with self.lock:
@@ -294,7 +372,7 @@ class JobStore:
     def _iseq_auth_message(self) -> str:
         return (
             "Token ISEQ recusado: a API retornou 401/403. "
-            "Abra o login automático novamente para capturar um token novo."
+            "Entre novamente no dashboard para renovar a conexão."
         )
 
     def _has_marker(self, text: str, markers: tuple[str, ...]) -> bool:
@@ -321,6 +399,8 @@ class JobStore:
                 if start <= record.data_local <= end
             )
         data = records_to_wide_rows(records)
+        if self.repository and job.user_id != "legacy":
+            self.repository.save_readings(job.user_id, job.equipment_id, job.id, data)
         data_path = self._job_dir(job.id) / "data.json"
         data_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         with self.lock:
@@ -360,13 +440,18 @@ class JobStore:
         return self._job_dir(job_id) / "job.json"
 
     def _save_job(self, job: JobState) -> None:
-        self._job_file(job.id).write_text(json.dumps(asdict(job), ensure_ascii=False, indent=2), encoding="utf-8")
+        state = asdict(job)
+        self._job_file(job.id).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        if self.repository and job.user_id != "legacy":
+            self.repository.save_import_job(state)
 
     def _load_job(self, job_id: str) -> JobState | None:
-        path = self._job_file(job_id)
-        if not path.exists():
-            return None
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = self.repository.load_import_job(job_id) if self.repository else None
+        if raw is None:
+            path = self._job_file(job_id)
+            if not path.exists():
+                return None
+            raw = json.loads(path.read_text(encoding="utf-8"))
         raw["tasks"] = [TaskState(**task) for task in raw.get("tasks", [])]
         job = JobState(**raw)
         if job.status in {"queued", "running", "retrying", "waiting_configuration"}:

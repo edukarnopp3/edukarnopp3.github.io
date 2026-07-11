@@ -8,7 +8,13 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://edukarnopp3.github.io,http://127.0.0.1:8765,http://localhost:8765"
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_SECRET
+        generateValue: true
+      - key: APP_SESSION_HOURS
+        value: "12"
       - key: ISEQ_STORAGE_DIR
         value: storage
       - key: ISEQ_JOB_WORKERS

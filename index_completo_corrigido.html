@@ -70,6 +70,35 @@
     margin-left: auto;
     display: flex; align-items: center; gap: 10px;
   }
+  .account-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .account-summary[hidden] { display: none; }
+  .account-name {
+    max-width: 220px;
+    color: var(--muted);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .icon-button {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 17px;
+  }
+  .icon-button:hover { border-color: var(--accent); color: var(--accent); }
   .badge {
     font-family: 'Space Mono', monospace;
     font-size: 10px;
@@ -84,9 +113,63 @@
   /* ─── Main Layout ───────────────────────────────────────── */
   main { padding: 28px 32px 60px; max-width: 1440px; margin: 0 auto; }
 
+  #login-section {
+    min-height: calc(100vh - 73px);
+    display: grid;
+    place-items: center;
+    padding: 32px 20px;
+  }
+  .login-panel {
+    width: min(420px, 100%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 32px;
+  }
+  .login-kicker {
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .login-panel h2 {
+    font-size: 22px;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+  .login-panel > p {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 22px;
+  }
+  .login-form {
+    display: grid;
+    gap: 14px;
+  }
+  .login-form .btn {
+    min-height: 42px;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .login-form .btn:disabled { cursor: wait; opacity: 0.6; }
+  .login-error {
+    display: none;
+    margin-top: 16px;
+    background: rgba(192,57,43,0.1);
+    border: 1px solid rgba(192,57,43,0.35);
+    border-radius: 8px;
+    color: #FFB3B3;
+    font-size: 12px;
+    padding: 11px 12px;
+  }
+  .login-error.show { display: block; }
+
   /* ─── Upload Zone ───────────────────────────────────────── */
   #upload-section {
-    display: flex; justify-content: center; align-items: center;
+    display: none; justify-content: center; align-items: center;
     min-height: calc(100vh - 80px);
     flex-direction: column; gap: 0;
     padding: 32px;
@@ -702,6 +785,9 @@
 
   /* ─── Responsive ────────────────────────────────────────── */
   @media(max-width: 900px) {
+    header { padding: 14px 16px; }
+    header p, .badge, .account-name { display: none; }
+    .login-panel { padding: 26px 22px; }
     main { padding: 16px; }
     #upload-section { padding: 16px; }
     .source-grid { grid-template-columns: 1fr; }
@@ -747,13 +833,38 @@
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v2.8</span>
-    <label class="btn btn-outline" for="file-reopen" title="Carregar outro arquivo" style="padding:7px 14px; font-size:12px;">
-      📂 Novo arquivo
-      <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
-    </label>
+    <span class="badge">v3.0</span>
+    <div class="account-summary" id="workspace-actions" hidden>
+      <span class="account-name" id="account-name"></span>
+      <label class="icon-button" for="file-reopen" title="Carregar outro arquivo" aria-label="Carregar outro arquivo">
+        +
+        <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
+      </label>
+      <button class="icon-button" id="logout-button" type="button" title="Sair" aria-label="Sair">↪</button>
+    </div>
   </div>
 </header>
+
+<!-- Login ISEQ -->
+<section id="login-section">
+  <div class="login-panel">
+    <div class="login-kicker">Acesso aos sensores</div>
+    <h2>Entrar com a conta ISEQ</h2>
+    <p>Seus ambientes e importações ficam vinculados somente a esta conta. A senha é usada apenas no login e não é armazenada.</p>
+    <form class="login-form" id="login-form">
+      <div class="field">
+        <label for="iseq-login">Usuário ou e-mail</label>
+        <input id="iseq-login" name="username" type="text" autocomplete="username" required/>
+      </div>
+      <div class="field">
+        <label for="iseq-password">Senha</label>
+        <input id="iseq-password" name="password" type="password" autocomplete="current-password" required/>
+      </div>
+      <button class="btn" id="login-submit" type="submit">Entrar</button>
+    </form>
+    <div class="login-error" id="login-error" role="alert" aria-live="polite"></div>
+  </div>
+</section>
 
 <!-- Upload section -->
 <div id="upload-section">
@@ -946,6 +1057,8 @@ const PARAM_ALIASES = {
 };
 const LOCAL_BACKEND_URL = 'http://127.0.0.1:8000';
 const CLOUD_BACKEND_URL = 'https://iseq-export-backend.onrender.com';
+const SESSION_TOKEN_KEY = 'airqualitySessionToken';
+let CURRENT_USER = null;
 function defaultBackendUrl() {
   const queryBackend = new URLSearchParams(location.search).get('backend');
   if(queryBackend) {
@@ -3416,12 +3529,101 @@ function renderRows(rows, sourceLabel) {
   hideLoading();
 }
 
+function storedSessionToken() {
+  return sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+}
+
+function setLoginError(message='') {
+  const error = document.getElementById('login-error');
+  error.textContent = message;
+  error.classList.toggle('show', Boolean(message));
+}
+
+function showLogin(message='') {
+  CURRENT_USER = null;
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  document.getElementById('login-section').style.display = 'grid';
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('app-section').style.display = 'none';
+  document.getElementById('workspace-actions').hidden = true;
+  setLoginError(message);
+  setTimeout(() => document.getElementById('iseq-login')?.focus(), 50);
+}
+
+function showWorkspace(user) {
+  CURRENT_USER = user || {};
+  document.getElementById('login-section').style.display = 'none';
+  document.getElementById('upload-section').style.display = 'flex';
+  document.getElementById('app-section').style.display = 'none';
+  document.getElementById('workspace-actions').hidden = false;
+  document.getElementById('account-name').textContent =
+    CURRENT_USER.display_name || CURRENT_USER.username || CURRENT_USER.email || 'Conta ISEQ';
+  setLoginError('');
+}
+
+async function submitIseqLogin(event) {
+  event.preventDefault();
+  const button = document.getElementById('login-submit');
+  const usernameOrEmail = document.getElementById('iseq-login').value.trim();
+  const passwordInput = document.getElementById('iseq-password');
+  if(!usernameOrEmail || !passwordInput.value) return;
+
+  button.disabled = true;
+  button.textContent = 'Entrando...';
+  setLoginError('');
+  try {
+    const payload = await fetchJson(`${getBackendUrl()}/api/auth/iseq/login`, {
+      method:'POST',
+      auth:false,
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username_or_email:usernameOrEmail, password:passwordInput.value})
+    });
+    sessionStorage.setItem(SESSION_TOKEN_KEY, payload.session_token);
+    passwordInput.value = '';
+    showWorkspace(payload.user);
+    if(Array.isArray(payload.equipment) && payload.equipment.length) {
+      populateIseqEnvironmentSelects(payload.equipment);
+      setIseqStatus(`${payload.equipment.length} ambiente(s) carregado(s) para esta conta.`, 'done');
+    } else {
+      await loadIseqEnvironments();
+    }
+  } catch(err) {
+    setLoginError(err.message || 'Não foi possível entrar agora.');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Entrar';
+  }
+}
+
+async function logoutSession() {
+  try {
+    await fetchJson(`${getBackendUrl()}/api/auth/logout`, {method:'POST'});
+  } catch(_err) {
+    // A sessão local deve ser encerrada mesmo se o backend estiver indisponível.
+  }
+  showLogin('');
+}
+
+async function initializeAuthentication() {
+  if(!storedSessionToken()) {
+    showLogin('');
+    return;
+  }
+  try {
+    const payload = await fetchJson(`${getBackendUrl()}/api/auth/session`);
+    showWorkspace(payload.user);
+    await loadIseqEnvironments({silent:true});
+  } catch(err) {
+    showLogin(err.message || 'Sua sessão terminou. Entre novamente.');
+  }
+}
+
 const DEFAULT_ISEQ_EQUIPMENT = {
   mac:'1C:69:20:C7:31:D8',
   location:'Sensor 1 padrão',
   label:'Sensor 1 padrão (1C:69:20:C7:31:D8)'
 };
-let ISEQ_EQUIPMENT = [DEFAULT_ISEQ_EQUIPMENT];
+let ISEQ_EQUIPMENT = [];
 
 function normalizeMac(value) {
   return String(value || '').trim().toUpperCase();
@@ -3444,7 +3646,6 @@ function normalizeEquipmentList(items) {
       label: location && location !== mac ? `${location} (${mac})` : mac,
     });
   });
-  if(!map.size) map.set(DEFAULT_ISEQ_EQUIPMENT.mac, DEFAULT_ISEQ_EQUIPMENT);
   return [...map.values()].sort((a,b) => equipmentLabel(a).localeCompare(equipmentLabel(b), 'pt-BR'));
 }
 
@@ -3458,7 +3659,7 @@ function populateIseqEnvironmentSelects(items) {
   ISEQ_EQUIPMENT = normalizeEquipmentList(items);
 
   const options = ISEQ_EQUIPMENT.map(item => `<option value="${item.mac}">${item.label}</option>`).join('');
-  env1.innerHTML = options;
+  env1.innerHTML = options || '<option value="">Nenhum ambiente disponível</option>';
   env2.innerHTML = `<option value="">Sem comparação</option>${options}`;
 
   const macs = new Set(ISEQ_EQUIPMENT.map(item => item.mac));
@@ -3592,10 +3793,27 @@ function backendModeLabel() {
   return 'backend online';
 }
 
-async function fetchJson(url, options) {
-  const res = await fetch(url, options);
+async function fetchJson(url, options={}) {
+  const {auth=true, ...requestOptions} = options || {};
+  const headers = new Headers(requestOptions.headers || {});
+  const token = storedSessionToken();
+  if(auth && token) headers.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(url, {...requestOptions, headers});
   const data = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.detail || data.message || `${res.status} ${res.statusText}`);
+  if(!res.ok) {
+    const detail = data.detail;
+    const code = detail && typeof detail === 'object' ? detail.code : data.code;
+    const message = detail && typeof detail === 'object'
+      ? detail.message
+      : detail || data.message || `${res.status} ${res.statusText}`;
+    const error = new Error(message);
+    error.code = code || '';
+    error.status = res.status;
+    if(auth && ['session_invalid','iseq_reauthentication_required'].includes(error.code)) {
+      showLogin(message);
+    }
+    throw error;
+  }
   return data;
 }
 
@@ -3671,6 +3889,8 @@ function showToast(msg, dur=5000) {
 
 document.getElementById('backend-url').value = DEFAULT_BACKEND_URL;
 setIseqStatus(`Usando ${backendModeLabel()}: ${getBackendUrl()}`, '');
+document.getElementById('login-form').addEventListener('submit', submitIseqLogin);
+document.getElementById('logout-button').addEventListener('click', logoutSession);
 document.getElementById('iseq-form').addEventListener('submit', startIseqJob);
 document.getElementById('environment-1')?.addEventListener('change', () => {
   const env1 = document.getElementById('environment-1');
@@ -3679,7 +3899,7 @@ document.getElementById('environment-1')?.addEventListener('change', () => {
     env2.value = ISEQ_EQUIPMENT.find(item => item.mac !== env1.value)?.mac || '';
   }
 });
-loadIseqEnvironments({silent:true});
+initializeAuthentication();
 
 // Drag-and-drop
 const dropZone = document.getElementById('drop-zone');

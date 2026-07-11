@@ -27,6 +27,10 @@ class CollectorNotConfigured(RuntimeError):
     pass
 
 
+class IseqAuthenticationError(RuntimeError):
+    pass
+
+
 class IseqCollector:
     def preflight(self) -> None:
         return None
@@ -367,8 +371,50 @@ class NotConfiguredCollector(IseqCollector):
         )
 
 
-def build_collector() -> IseqCollector:
-    token = os.getenv("ISEQ_BEARER_TOKEN")
+def authenticate_iseq(
+    username_or_email: str,
+    password: str,
+    api_base: str | None = None,
+) -> tuple[str, dict[str, object]]:
+    base = (api_base or os.getenv("ISEQ_API_BASE") or "https://sensores.iseq.com.br/api-v2-staging").rstrip("/") + "/"
+    payload = json.dumps(
+        {"usernameOrEmail": username_or_email, "password": password}
+    ).encode("utf-8")
+    request = Request(
+        urljoin(base, "login"),
+        data=payload,
+        method="POST",
+        headers={
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "Origin": "https://sensores.iseq.com.br",
+            "Referer": "https://sensores.iseq.com.br/login",
+            "User-Agent": "Mozilla/5.0",
+        },
+    )
+    try:
+        with urlopen(request, timeout=45) as response:
+            raw = response.read().decode("utf-8")
+    except HTTPError as exc:
+        if exc.code in {400, 401, 403}:
+            raise IseqAuthenticationError("Usuário, e-mail ou senha ISEQ inválidos.") from exc
+        raise RuntimeError(f"O login da ISEQ retornou HTTP {exc.code}.") from exc
+    except (URLError, TimeoutError) as exc:
+        raise RuntimeError("Não foi possível acessar o login da ISEQ agora.") from exc
+
+    response_payload = json.loads(raw) if raw else {}
+    token = response_payload.get("token") if isinstance(response_payload, dict) else None
+    if not token:
+        raise RuntimeError("A ISEQ aceitou o login, mas não devolveu um token de acesso.")
+
+    client = ApiReportCollector(token=str(token), api_base=base)
+    profile_payload = client._request_json("me")
+    profile = profile_payload if isinstance(profile_payload, dict) else {}
+    return str(token), profile
+
+
+def build_collector(token: str | None = None) -> IseqCollector:
+    token = token or os.getenv("ISEQ_BEARER_TOKEN")
     if token:
         return ApiReportCollector(token=token, api_base=os.getenv("ISEQ_API_BASE"))
     export_dir = os.getenv("ISEQ_EXPORT_DIR")

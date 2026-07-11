@@ -1,65 +1,38 @@
 # Monitor de Qualidade do Ar
 
-Painel estático para análise de dados dos sensores ISEQ, com upload manual de Excel e integração preparada para um backend FastAPI.
+Dashboard do TCC para importar e analisar os nove parâmetros dos sensores ISEQ, comparar dois equipamentos instalados no mesmo ambiente e avaliar sua concordância estatística.
 
-## Publicação no GitHub Pages
+## Site
 
-Use este diretório como repositório GitHub e publique a branch principal pelo GitHub Pages. O arquivo `index.html` redireciona para `index_completo_corrigido.html`.
+O frontend é publicado pelo GitHub Pages e usa o backend hospedado no Render. A página inicial redireciona para `index_completo_corrigido.html`.
 
-## Uso local do painel
+Cada pessoa entra com a própria conta ISEQ. A senha não é armazenada; o backend guarda somente o token criptografado e separa sensores, importações e leituras por usuário.
 
-Abra `index_completo_corrigido.html` no navegador. O upload aceita:
+## Fontes de dados
 
-- planilhas antigas com aba `Dados brutos` e coluna `data_local`;
-- exportações ISEQ com aba `Dados` no formato longo (`Timestamp (Local)`, `Parâmetro solicitado`, `Valor`);
-- vários arquivos ISEQ ao mesmo tempo, um por parâmetro.
+- importação automática dos ambientes vinculados à conta ISEQ;
+- comparação simultânea entre dois sensores;
+- planilhas antigas com aba `Dados brutos`;
+- exportações ISEQ com aba `Dados` no formato longo.
 
-## Backend ISEQ
+## Desenvolvimento local
 
-O backend fica em `backend/` e expõe jobs para buscar dados por intervalo. Para iniciar com login assistido, sem copiar token manualmente:
-
-```powershell
-cd backend
-python login_and_run.py
-```
-
-Na primeira vez, se aparecer aviso de Playwright ausente, instale com:
-
-```powershell
-pip install playwright
-python -m playwright install chromium
-```
-
-Esse modo abre o ISEQ, espera voce fazer login e inicia o backend em `http://127.0.0.1:8000` sem imprimir o token.
-
-Para testar localmente sem instalar FastAPI e usando token manual:
-
-```powershell
-cd backend
-$env:ISEQ_BEARER_TOKEN="COLE_SEU_TOKEN_AQUI"
-python dev_server.py
-```
-
-Nao salve esse token no GitHub. Se ele expirar, faca login novamente no ISEQ e atualize a variavel.
-
-Para testar com arquivos `.xlsx` ja exportados:
-
-```powershell
-cd backend
-python dev_server.py
-```
-
-Abra o painel e mantenha a URL do backend como `http://127.0.0.1:8000`.
-
-Para rodar com FastAPI, igual ao deploy:
+Inicie o backend:
 
 ```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-$env:ISEQ_EXPORT_DIR="C:\Users\eduardo\Downloads"
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+python login_and_run.py
 ```
 
-No painel, configure a URL do backend como `http://127.0.0.1:8000`.
+Em outro terminal, sirva o frontend:
+
+```powershell
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+Abra `http://127.0.0.1:8765/`.
+
+As instruções do banco e do deploy estão em `backend/README.md`.

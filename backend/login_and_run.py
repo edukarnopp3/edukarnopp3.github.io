@@ -3,111 +3,32 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-import sys
-import time
 
-
-LOGIN_URL = "https://sensores.iseq.com.br/login"
+import uvicorn
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Login assistido no ISEQ.")
+    parser = argparse.ArgumentParser(description="Inicia o backend local do dashboard ISEQ.")
     parser.add_argument(
         "--print-token",
         action="store_true",
-        help="Imprime o token capturado para configurar ISEQ_BEARER_TOKEN em um backend hospedado.",
+        help="Opção antiga mantida por compatibilidade; o token não precisa mais ser copiado.",
     )
     args = parser.parse_args()
 
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        print("Playwright nao esta instalado.")
-        print("Instale uma vez com:")
-        print("  pip install playwright")
-        print("  python -m playwright install chromium")
-        return 1
-
-    print("Abrindo janela de login do ISEQ...")
-    if args.print_token:
-        print("Faca login normalmente. O token sera impresso uma unica vez para voce copiar ao Render.")
-    else:
-        print("Faca login normalmente. O token sera usado so nesta execucao e nao sera impresso.")
-
-    with sync_playwright() as playwright:
-        user_data_dir = Path(__file__).resolve().parent / ".browser-profile"
-        browser_type = playwright.chromium
-        context = browser_type.launch_persistent_context(
-            str(user_data_dir),
-            headless=False,
-            channel="chrome",
-            viewport={"width": 1366, "height": 900},
-        )
-        page = context.pages[0] if context.pages else context.new_page()
-        page.goto(LOGIN_URL)
-        clear_stale_token(page)
-
-        token = wait_for_token(page)
-        context.close()
-
-    if not token:
-        print("Nao encontrei token. Tente fazer login novamente e aguardar o dashboard abrir.")
-        return 1
-
-    if args.print_token:
-        print("\nISEQ_BEARER_TOKEN:")
-        print(token)
-        print("\nCole esse valor nas Environment Variables do Render. Nao salve no GitHub.")
-        return 0
-
-    os.environ["ISEQ_BEARER_TOKEN"] = token
-    os.environ.setdefault("ISEQ_STORAGE_DIR", str(Path(__file__).resolve().parent / "storage"))
-
-    from dev_server import Handler
-    from http.server import ThreadingHTTPServer
-
+    os.environ.setdefault(
+        "ISEQ_STORAGE_DIR",
+        str(Path(__file__).resolve().parent / "storage"),
+    )
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
-    print(f"Login detectado. Backend local em http://{host}:{port}")
-    print("Deixe esta janela aberta enquanto usa o painel.")
-    ThreadingHTTPServer((host, port), Handler).serve_forever()
+
+    if args.print_token:
+        print("O token não precisa mais ser copiado. O login agora acontece dentro do dashboard.")
+    print(f"Backend local em http://{host}:{port}")
+    print("Abra o dashboard e entre com sua conta ISEQ.")
+    uvicorn.run("app.main:app", host=host, port=port)
     return 0
-
-
-def clear_stale_token(page) -> None:
-    try:
-        page.wait_for_load_state("domcontentloaded", timeout=15000)
-    except Exception:
-        pass
-    try:
-        page.evaluate(
-            "() => { localStorage.removeItem('token'); sessionStorage.removeItem('token'); }"
-        )
-        print("Token local antigo removido. Faca login novamente se a tela pedir.")
-    except Exception:
-        pass
-    try:
-        page.reload(wait_until="domcontentloaded")
-    except Exception:
-        pass
-
-
-def wait_for_token(page) -> str | None:
-    deadline = time.time() + 300
-    last_url = ""
-    while time.time() < deadline:
-        try:
-            current_url = page.url
-            if current_url != last_url:
-                last_url = current_url
-                print(f"Pagina atual: {current_url}")
-            token = page.evaluate("() => localStorage.getItem('token')")
-            if token:
-                return token
-        except Exception:
-            pass
-        time.sleep(1)
-    return None
 
 
 if __name__ == "__main__":
