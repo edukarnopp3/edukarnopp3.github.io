@@ -17,6 +17,7 @@ from .iseq_parser import parse_iseq_xlsx, records_to_wide_rows
 MAX_RETRY_SECONDS = 15 * 60
 IDLE_SLEEP_SECONDS = 5
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "stale"}
+SUCCESS_TASK_STATUSES = {"completed", "cached"}
 ISEQ_UNAVAILABLE_MARKERS = (
     "HTTP 502",
     "HTTP 503",
@@ -53,6 +54,8 @@ class JobState:
     total_tasks: int = 0
     worker_count: int = 1
     completed_tasks: int = 0
+    cached_tasks: int = 0
+    download_tasks: int = 0
     attempted_tasks: int = 0
     failed_attempts: int = 0
     message: str = "Aguardando início."
@@ -77,6 +80,20 @@ class JobRepository(Protocol):
         start: datetime,
         end: datetime,
     ) -> list[dict[str, object]]: ...
+    def save_coverage(
+        self,
+        user_id: str,
+        equipment_id: str,
+        job_id: str,
+        tasks: list[dict[str, object]],
+    ) -> None: ...
+    def get_coverage(
+        self,
+        user_id: str,
+        equipment_id: str,
+        start: datetime,
+        end: datetime,
+    ) -> dict[str, list[tuple[datetime, datetime]]]: ...
 
 
 class JobStore:
@@ -109,6 +126,18 @@ class JobStore:
     ) -> JobState:
         job_id = uuid.uuid4().hex[:12]
         export_tasks = build_export_tasks(equipment_id, start, end)
+        coverage = (
+            self.repository.get_coverage(user_id, equipment_id, start, end)
+            if self.repository and user_id != "legacy"
+            else {}
+        )
+        task_states = []
+        for export_task in export_tasks:
+            task_state = self._task_to_state(export_task)
+            if self._task_is_covered(export_task, coverage):
+                task_state.status = "cached"
+            task_states.append(task_state)
+        cached_tasks = sum(1 for task in task_states if task.status == "cached")
         job = JobState(
             id=job_id,
             equipment_id=equipment_id,
@@ -117,12 +146,25 @@ class JobStore:
             user_id=user_id,
             total_tasks=len(export_tasks),
             worker_count=self._normalize_worker_count(workers),
-            tasks=[self._task_to_state(task) for task in export_tasks],
+            completed_tasks=cached_tasks,
+            cached_tasks=cached_tasks,
+            download_tasks=len(export_tasks) - cached_tasks,
+            tasks=task_states,
         )
+        if job.download_tasks == 0:
+            job.status = "completed"
+            job.message = "Dados carregados do banco; nenhuma nova requisicao foi enviada a ISEQ."
+        elif cached_tasks:
+            job.message = (
+                f"{cached_tasks}/{job.total_tasks} etapas encontradas no banco; "
+                f"baixando somente {job.download_tasks} etapas ausentes."
+            )
         with self.lock:
             self.jobs[job_id] = job
             self._save_job(job)
 
+        if job.status == "completed":
+            return job
         worker = threading.Thread(target=self._run_job, args=(job_id,), daemon=True)
         worker.start()
         return job
@@ -160,9 +202,13 @@ class JobStore:
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs[job_id]
-            worker_count = min(job.worker_count, max(1, job.total_tasks))
+            worker_count = min(job.worker_count, max(1, job.download_tasks))
             job.status = "running"
-            job.message = f"Exportando parâmetros com {worker_count} tarefas em paralelo."
+            cache_message = f" {job.cached_tasks} etapas vieram do banco." if job.cached_tasks else ""
+            job.message = (
+                f"Exportando parametros ausentes com {worker_count} tarefas em paralelo."
+                f"{cache_message}"
+            )
             job.updated_at = datetime.now().isoformat(timespec="seconds")
             self._save_job(job)
 
@@ -201,7 +247,7 @@ class JobStore:
 
         with self.lock:
             job = self.jobs[job_id]
-            if not all(task.status == "completed" for task in job.tasks):
+            if not all(task.status in SUCCESS_TASK_STATUSES for task in job.tasks):
                 return
             job.message = "Combinando arquivos exportados."
             job.updated_at = datetime.now().isoformat(timespec="seconds")
@@ -231,7 +277,7 @@ class JobStore:
                     return
                 pending = self._next_runnable_task(job)
                 if pending is None:
-                    if all(task.status == "completed" for task in job.tasks):
+                    if all(task.status in SUCCESS_TASK_STATUSES for task in job.tasks):
                         return
                     job.status = "running"
                     job.message = self._waiting_message(job)
@@ -269,7 +315,10 @@ class JobStore:
                 task.next_retry_at = None
                 self._refresh_counts(job)
                 active = sum(1 for item in job.tasks if item.status == "running")
-                job.message = f"{task.parameter} concluído ({job.completed_tasks}/{job.total_tasks}); {active} tarefas ativas."
+                job.message = (
+                    f"{task.parameter} concluído ({job.completed_tasks}/{job.total_tasks}); "
+                    f"{job.cached_tasks} do banco e {active} tarefas ativas."
+                )
                 job.updated_at = datetime.now().isoformat(timespec="seconds")
                 self._save_job(job)
         except CollectorNotConfigured as exc:
@@ -340,16 +389,21 @@ class JobStore:
         return f"Aguardando novas tentativas. Pendentes: {pending}; em retentativa: {retrying}."
 
     def _refresh_counts(self, job: JobState) -> None:
-        job.completed_tasks = sum(1 for task in job.tasks if task.status == "completed")
+        job.completed_tasks = sum(
+            1 for task in job.tasks if task.status in SUCCESS_TASK_STATUSES
+        )
+        job.cached_tasks = sum(1 for task in job.tasks if task.status == "cached")
+        job.download_tasks = job.total_tasks - job.cached_tasks
         job.attempted_tasks = sum(1 for task in job.tasks if task.attempts > 0 or task.status == "completed")
 
     def _job_stop_message(self, job: JobState) -> str | None:
-        if not job.tasks or job.completed_tasks > 0:
+        remote_tasks = [task for task in job.tasks if task.status != "cached"]
+        if not remote_tasks or any(task.status == "completed" for task in remote_tasks):
             return None
-        if not all(task.attempts > 0 for task in job.tasks):
+        if not all(task.attempts > 0 for task in remote_tasks):
             return None
 
-        errors = [task.last_error or "" for task in job.tasks]
+        errors = [task.last_error or "" for task in remote_tasks]
         if errors and all(self._has_marker(error, ISEQ_UNAVAILABLE_MARKERS) for error in errors):
             return self._iseq_unavailable_message()
         if errors and all(self._has_marker(error, ISEQ_AUTH_MARKERS) for error in errors):
@@ -401,12 +455,21 @@ class JobStore:
         data = records_to_wide_rows(records)
         if self.repository and job.user_id != "legacy":
             self.repository.save_readings(job.user_id, job.equipment_id, job.id, data)
+            self.repository.save_coverage(
+                job.user_id,
+                job.equipment_id,
+                job.id,
+                [asdict(task) for task in job.tasks if task.status == "completed"],
+            )
         data_path = self._job_dir(job.id) / "data.json"
         data_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         with self.lock:
             job.status = "completed"
             job.data_file = str(data_path)
-            job.message = f"Concluído com {len(data)} timestamps combinados."
+            job.message = (
+                f"Banco atualizado com {len(data)} timestamps novos; "
+                f"{job.cached_tasks} etapas foram reutilizadas."
+            )
             job.updated_at = datetime.now().isoformat(timespec="seconds")
             self._save_job(job)
 
@@ -417,6 +480,22 @@ class JobStore:
             start=task.start.isoformat(timespec="seconds"),
             end=task.end.isoformat(timespec="seconds"),
         )
+
+    def _task_is_covered(
+        self,
+        task: ExportTask,
+        coverage: dict[str, list[tuple[datetime, datetime]]],
+    ) -> bool:
+        cursor = task.start
+        for period_start, period_end in coverage.get(task.parameter, []):
+            if period_end < cursor:
+                continue
+            if period_start > cursor:
+                return False
+            cursor = max(cursor, period_end)
+            if cursor >= task.end:
+                return True
+        return False
 
     def _state_to_task(self, state: TaskState) -> ExportTask:
         return ExportTask(

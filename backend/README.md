@@ -11,6 +11,9 @@ Backend FastAPI do dashboard de qualidade do ar. Cada usuário entra com a próp
 - leituras normalizadas dos nove parâmetros.
 
 As leituras usam uma linha por sensor e timestamp. Uma nova importação do mesmo período atualiza os registros existentes em vez de duplicá-los.
+Todos os sensores usam o mesmo banco, mas os dados são isolados por usuário e `sensor_id`. Isso evita manter vários bancos gratuitos e permite comparar os sensores diretamente.
+
+O backend também registra a cobertura de cada parâmetro por período. Ao pedir novamente um intervalo já importado, o dashboard lê o Supabase e consulta a ISEQ somente para as partes que ainda estiverem ausentes.
 
 ## Rodar localmente
 

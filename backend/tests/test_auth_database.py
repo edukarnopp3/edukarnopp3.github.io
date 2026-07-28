@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.collector import IseqCollector
+from app.collector import IseqCollector, build_export_tasks
 from app.database import DatabaseStore, IseqConnection
 from app.jobs import JobState, JobStore, TaskState
 import app.main as main_module
@@ -138,6 +138,99 @@ class DatabaseStoreTests(unittest.TestCase):
 
         self.database.revoke_session(raw_session)
         self.assertIsNone(self.database.get_session(raw_session))
+
+    def test_coverage_is_isolated_by_sensor(self) -> None:
+        user = self.database.connect_iseq_account(
+            login_hint="cobertura@example.com",
+            token="iseq-coverage-token",
+            profile={"id": 72, "username": "cobertura"},
+        )
+        user_id = str(user["id"])
+        start = datetime(2026, 3, 1)
+        middle = datetime(2026, 3, 1, 12)
+        end = datetime(2026, 3, 2)
+
+        self.database.save_coverage(
+            user_id,
+            "AA:BB:CC:DD:EE:01",
+            "coverage-job",
+            [
+                {"parameter": "CO2", "start": start, "end": middle},
+                {"parameter": "CO2", "start": middle, "end": end},
+            ],
+        )
+
+        coverage = self.database.get_coverage(
+            user_id,
+            "AA:BB:CC:DD:EE:01",
+            start,
+            end,
+        )
+        self.assertEqual(coverage["CO2"], [(start, middle), (middle, end)])
+        self.assertEqual(
+            self.database.get_coverage(
+                user_id,
+                "AA:BB:CC:DD:EE:02",
+                start,
+                end,
+            ),
+            {},
+        )
+
+    def test_completed_period_is_loaded_without_calling_iseq(self) -> None:
+        user = self.database.connect_iseq_account(
+            login_hint="cache@example.com",
+            token="iseq-cache-token",
+            profile={"id": 73, "username": "cache"},
+        )
+        user_id = str(user["id"])
+        equipment_id = "AA:BB:CC:DD:EE:01"
+        start = datetime(2026, 3, 1)
+        end = datetime(2026, 3, 1, 1)
+        tasks = build_export_tasks(equipment_id, start, end)
+
+        self.database.save_readings(
+            user_id,
+            equipment_id,
+            "original-job",
+            [{"data_local": "2026-03-01T00:30:00", "CO2": 480}],
+        )
+        self.database.save_coverage(
+            user_id,
+            equipment_id,
+            "original-job",
+            [
+                {
+                    "parameter": task.parameter,
+                    "start": task.start,
+                    "end": task.end,
+                }
+                for task in tasks
+            ],
+        )
+
+        def unexpected_collector(_user_id: str) -> IseqCollector:
+            raise AssertionError("A ISEQ não deveria ser chamada para um período em cache.")
+
+        store = JobStore(
+            storage_dir=Path(self.temp_dir.name) / "cached-jobs",
+            collector_factory=unexpected_collector,
+            repository=self.database,
+        )
+        job = store.create_job(
+            equipment_id,
+            start,
+            end,
+            workers=6,
+            user_id=user_id,
+        )
+
+        self.assertEqual(job.status, "completed")
+        self.assertEqual(job.cached_tasks, len(tasks))
+        self.assertEqual(job.completed_tasks, len(tasks))
+        self.assertEqual(job.download_tasks, 0)
+        self.assertTrue(all(task.status == "cached" for task in job.tasks))
+        self.assertEqual(store.get_data(job.id)[0]["CO2"], 480.0)
 
 
 class AuthApiTests(unittest.TestCase):

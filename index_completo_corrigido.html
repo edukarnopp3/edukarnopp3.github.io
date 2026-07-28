@@ -3828,14 +3828,23 @@ function setIseqProgress(job) {
   const total = Number(job.total_tasks || 0);
   const completed = Number(job.completed_tasks || 0);
   const attempted = Number(job.attempted_tasks || 0);
+  const cached = Number(job.cached_tasks || 0);
+  const downloads = Number(job.download_tasks ?? Math.max(0, total - cached));
   const percent = total ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 0;
-  const attemptedPercent = total ? Math.max(percent, Math.min(100, Math.round((attempted / total) * 100))) : 0;
+  const attemptedBase = downloads > 0 ? downloads : 1;
+  const attemptedPercent = attemptedBase
+    ? Math.max(percent, Math.min(100, Math.round((attempted / attemptedBase) * 100)))
+    : percent;
   const done = job.status === 'completed';
-  const title = done ? 'Exportação concluída' : 'Exportando parâmetros';
+  const title = done && cached === total && total > 0
+    ? 'Dados carregados do banco'
+    : done
+      ? 'Importação concluída'
+      : 'Sincronizando dados';
   const detail = job.message || (done ? 'Dados prontos para análise.' : 'Aguardando resposta do backend...');
   const percentLabel = percent > 0 || done ? `${percent}%` : attempted > 0 ? `${attemptedPercent}% tentado` : '0%';
   const progressText = total
-    ? `${completed}/${total} concluídas · ${attempted}/${total} tentadas`
+    ? `${completed}/${total} disponíveis · ${cached} do banco · ${attempted}/${downloads} ISEQ`
     : 'iniciando';
   const el = document.getElementById('iseq-status');
   el.classList.toggle('error', false);

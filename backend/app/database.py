@@ -17,6 +17,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -128,6 +129,34 @@ class Reading(Base):
     humidity: Mapped[float | None] = mapped_column(Float, nullable=True)
     temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
     pressure: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class SensorCoverage(Base):
+    __tablename__ = "sensor_coverage"
+    __table_args__ = (
+        UniqueConstraint(
+            "sensor_id",
+            "parameter",
+            "period_start",
+            "period_end",
+            name="uq_sensor_coverage_period",
+        ),
+        Index(
+            "ix_sensor_coverage_lookup",
+            "sensor_id",
+            "parameter",
+            "period_start",
+            "period_end",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sensor_id: Mapped[int] = mapped_column(ForeignKey("sensors.id"), index=True)
+    parameter: Mapped[str] = mapped_column(String(32))
+    period_start: Mapped[datetime] = mapped_column(DateTime)
+    period_end: Mapped[datetime] = mapped_column(DateTime)
+    source_job_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 
@@ -448,6 +477,102 @@ class DatabaseStore:
                 .order_by(Reading.recorded_at)
             ).all()
             return [self._reading_to_row(reading) for reading in readings]
+
+    def save_coverage(
+        self,
+        user_id: str,
+        equipment_id: str,
+        job_id: str,
+        tasks: Iterable[dict[str, object]],
+    ) -> None:
+        sensor_id = self._ensure_sensor(user_id, equipment_id)
+        payload = []
+        saved_at = utcnow()
+        for task in tasks:
+            parameter = str(task.get("parameter") or "").strip()
+            start = task.get("start")
+            end = task.get("end")
+            if not parameter or not start or not end:
+                continue
+            payload.append(
+                {
+                    "sensor_id": sensor_id,
+                    "parameter": parameter,
+                    "period_start": (
+                        start
+                        if isinstance(start, datetime)
+                        else datetime.fromisoformat(str(start))
+                    ),
+                    "period_end": (
+                        end
+                        if isinstance(end, datetime)
+                        else datetime.fromisoformat(str(end))
+                    ),
+                    "source_job_id": job_id,
+                    "updated_at": saved_at,
+                }
+            )
+
+        if not payload:
+            return
+        with Session(self.engine) as session:
+            if self.engine.dialect.name == "postgresql":
+                statement = postgres_insert(SensorCoverage).values(payload)
+            else:
+                statement = sqlite_insert(SensorCoverage).values(payload)
+            statement = statement.on_conflict_do_update(
+                index_elements=[
+                    SensorCoverage.sensor_id,
+                    SensorCoverage.parameter,
+                    SensorCoverage.period_start,
+                    SensorCoverage.period_end,
+                ],
+                set_={
+                    "source_job_id": statement.excluded.source_job_id,
+                    "updated_at": statement.excluded.updated_at,
+                },
+            )
+            session.execute(statement)
+            session.commit()
+
+    def get_coverage(
+        self,
+        user_id: str,
+        equipment_id: str,
+        start: datetime,
+        end: datetime,
+    ) -> dict[str, list[tuple[datetime, datetime]]]:
+        with Session(self.engine) as session:
+            sensor = session.scalar(
+                select(Sensor).where(
+                    Sensor.user_id == user_id,
+                    Sensor.mac == equipment_id.strip().upper(),
+                )
+            )
+            if not sensor:
+                return {}
+            periods = session.execute(
+                select(
+                    SensorCoverage.parameter,
+                    SensorCoverage.period_start,
+                    SensorCoverage.period_end,
+                )
+                .where(
+                    SensorCoverage.sensor_id == sensor.id,
+                    SensorCoverage.period_end >= start,
+                    SensorCoverage.period_start <= end,
+                )
+                .order_by(
+                    SensorCoverage.parameter,
+                    SensorCoverage.period_start,
+                    SensorCoverage.period_end,
+                )
+            ).all()
+
+        coverage: dict[str, list[tuple[datetime, datetime]]] = {}
+        for parameter, period_start, period_end in periods:
+            coverage.setdefault(parameter, []).append((period_start, period_end))
+        return coverage
 
     def _ensure_sensor(self, user_id: str, equipment_id: str) -> int:
         mac = equipment_id.strip().upper()
