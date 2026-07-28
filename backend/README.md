@@ -14,6 +14,7 @@ As leituras usam uma linha por sensor e timestamp. Uma nova importação do mesm
 Todos os sensores usam o mesmo banco, mas os dados são isolados por usuário e `sensor_id`. Isso evita manter vários bancos gratuitos e permite comparar os sensores diretamente.
 
 O backend também registra a cobertura de cada parâmetro por período. Ao pedir novamente um intervalo já importado, o dashboard lê o Supabase e consulta a ISEQ somente para as partes que ainda estiverem ausentes.
+Cada parâmetro e intervalo concluído é salvo imediatamente. Se o Render reiniciar durante uma importação longa, uma nova tentativa reaproveita as etapas já persistidas. Os arquivos XLSX temporários são removidos depois da gravação para reduzir o uso de disco.
 
 ## Rodar localmente
 

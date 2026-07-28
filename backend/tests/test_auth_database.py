@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.collector import IseqCollector, build_export_tasks
 from app.database import DatabaseStore, IseqConnection
+from app.iseq_parser import IseqRecord
 from app.jobs import JobState, JobStore, TaskState
 import app.main as main_module
 
@@ -30,6 +31,14 @@ class FakeCollector(IseqCollector):
                 "label": "Sala de testes (AA:BB:CC:DD:EE:01)",
             }
         ]
+
+
+class ProgressiveCollector(IseqCollector):
+    def fetch_export(self, task, destination_dir: Path) -> Path:
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        path = destination_dir / f"{task.parameter}.xlsx"
+        path.write_bytes(b"temporary-export")
+        return path
 
 
 class DatabaseStoreTests(unittest.TestCase):
@@ -231,6 +240,60 @@ class DatabaseStoreTests(unittest.TestCase):
         self.assertEqual(job.download_tasks, 0)
         self.assertTrue(all(task.status == "cached" for task in job.tasks))
         self.assertEqual(store.get_data(job.id)[0]["CO2"], 480.0)
+
+    def test_each_completed_task_is_persisted_and_its_file_is_removed(self) -> None:
+        user = self.database.connect_iseq_account(
+            login_hint="progressivo@example.com",
+            token="iseq-progress-token",
+            profile={"id": 74, "username": "progressivo"},
+        )
+        user_id = str(user["id"])
+        equipment_id = "AA:BB:CC:DD:EE:01"
+        start = datetime(2026, 3, 1)
+        end = datetime(2026, 3, 2)
+        store = JobStore(
+            storage_dir=Path(self.temp_dir.name) / "progressive-jobs",
+            collector_factory=lambda _user_id: ProgressiveCollector(),
+            repository=self.database,
+        )
+        task = TaskState(
+            equipment_id=equipment_id,
+            parameter="CO2",
+            start=start.isoformat(),
+            end=end.isoformat(),
+        )
+        job = JobState(
+            id="progressive-job",
+            user_id=user_id,
+            equipment_id=equipment_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+            total_tasks=1,
+            download_tasks=1,
+            tasks=[task],
+        )
+        store.jobs[job.id] = job
+
+        with patch(
+            "app.jobs.parse_iseq_xlsx",
+            return_value=[IseqRecord(datetime(2026, 3, 1, 12), "CO2", 512.0)],
+        ):
+            store._run_task_once(job.id, task, ProgressiveCollector())
+
+        self.assertEqual(task.status, "completed")
+        self.assertIsNone(task.file_path)
+        self.assertFalse((store._job_export_dir(job.id) / "CO2.xlsx").exists())
+        rows = self.database.get_readings(user_id, equipment_id, start, end)
+        self.assertEqual(rows[0]["CO2"], 512.0)
+        coverage = self.database.get_coverage(user_id, equipment_id, start, end)
+        self.assertEqual(coverage["CO2"], [(start, end)])
+        with patch(
+            "app.jobs.parse_iseq_xlsx",
+            side_effect=AssertionError("A finalização não deve reler arquivos já persistidos."),
+        ):
+            store._finalize_job(job)
+        self.assertEqual(job.status, "completed")
+        self.assertIn("salvas progressivamente", job.message)
 
 
 class AuthApiTests(unittest.TestCase):

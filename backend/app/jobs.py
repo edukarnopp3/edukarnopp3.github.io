@@ -307,17 +307,24 @@ class JobStore:
 
         try:
             file_path = collector.fetch_export(self._state_to_task(task), self._job_export_dir(job_id))
+            persisted_rows = self._persist_task_result(job_id, task, file_path)
             with self.lock:
                 job = self.jobs[job_id]
                 task.status = "completed"
-                task.file_path = str(file_path)
+                task.file_path = None if persisted_rows is not None else str(file_path)
                 task.last_error = None
                 task.next_retry_at = None
                 self._refresh_counts(job)
                 active = sum(1 for item in job.tasks if item.status == "running")
+                storage_message = (
+                    f" {persisted_rows} timestamps salvos no banco."
+                    if persisted_rows is not None
+                    else ""
+                )
                 job.message = (
                     f"{task.parameter} concluído ({job.completed_tasks}/{job.total_tasks}); "
                     f"{job.cached_tasks} do banco e {active} tarefas ativas."
+                    f"{storage_message}"
                 )
                 job.updated_at = datetime.now().isoformat(timespec="seconds")
                 self._save_job(job)
@@ -443,35 +450,76 @@ class JobStore:
         return max(1, min(parsed, 6))
 
     def _finalize_job(self, job: JobState) -> None:
-        files = [task.file_path for task in job.tasks if task.file_path]
-        start = datetime.fromisoformat(job.start)
-        end = datetime.fromisoformat(job.end)
-        records = []
-        for file_path in files:
-            records.extend(
-                record for record in parse_iseq_xlsx(file_path)
-                if start <= record.data_local <= end
-            )
-        data = records_to_wide_rows(records)
-        if self.repository and job.user_id != "legacy":
-            self.repository.save_readings(job.user_id, job.equipment_id, job.id, data)
-            self.repository.save_coverage(
-                job.user_id,
-                job.equipment_id,
-                job.id,
-                [asdict(task) for task in job.tasks if task.status == "completed"],
-            )
+        database_backed = self.repository is not None and job.user_id != "legacy"
+        data = [] if database_backed else self._combine_job_files(job)
         data_path = self._job_dir(job.id) / "data.json"
         data_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         with self.lock:
             job.status = "completed"
             job.data_file = str(data_path)
-            job.message = (
-                f"Banco atualizado com {len(data)} timestamps novos; "
-                f"{job.cached_tasks} etapas foram reutilizadas."
-            )
+            if database_backed:
+                new_tasks = job.completed_tasks - job.cached_tasks
+                job.message = (
+                    f"Importação concluída: {new_tasks} etapas salvas progressivamente "
+                    f"e {job.cached_tasks} reutilizadas do banco."
+                )
+            else:
+                job.message = f"Concluído com {len(data)} timestamps combinados."
             job.updated_at = datetime.now().isoformat(timespec="seconds")
             self._save_job(job)
+
+    def _persist_task_result(
+        self,
+        job_id: str,
+        task: TaskState,
+        file_path: str | Path,
+    ) -> int | None:
+        with self.lock:
+            job = self.jobs[job_id]
+            if not self.repository or job.user_id == "legacy":
+                return None
+            user_id = job.user_id
+            equipment_id = job.equipment_id
+
+        start = datetime.fromisoformat(task.start)
+        end = datetime.fromisoformat(task.end)
+        records = [
+            record
+            for record in parse_iseq_xlsx(file_path)
+            if start <= record.data_local <= end
+        ]
+        rows = records_to_wide_rows(records)
+        self.repository.save_readings(user_id, equipment_id, job_id, rows)
+        self.repository.save_coverage(
+            user_id,
+            equipment_id,
+            job_id,
+            [asdict(task)],
+        )
+        self._discard_export_file(job_id, file_path)
+        return len(rows)
+
+    def _combine_job_files(self, job: JobState) -> list[dict[str, object]]:
+        start = datetime.fromisoformat(job.start)
+        end = datetime.fromisoformat(job.end)
+        records = []
+        for file_path in (task.file_path for task in job.tasks if task.file_path):
+            records.extend(
+                record
+                for record in parse_iseq_xlsx(file_path)
+                if start <= record.data_local <= end
+            )
+        return records_to_wide_rows(records)
+
+    def _discard_export_file(self, job_id: str, file_path: str | Path) -> None:
+        export_dir = self._job_export_dir(job_id).resolve()
+        candidate = Path(file_path).resolve()
+        if export_dir not in candidate.parents:
+            return
+        try:
+            candidate.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def _task_to_state(self, task: ExportTask) -> TaskState:
         return TaskState(
