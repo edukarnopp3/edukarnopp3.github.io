@@ -1855,11 +1855,14 @@
     .panel-basic-stats {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .panel .charts-grid-bottom {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 520px) {
-    .compact-period,
-    .sensor-view-modes {
+    .compact-period {
       grid-template-columns: 1fr;
     }
   }
