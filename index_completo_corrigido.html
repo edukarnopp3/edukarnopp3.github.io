@@ -2149,7 +2149,19 @@ let CURRENT_VIEW_ROWS = [];
 let CURRENT_AVAILABLE_PARAMS = [];
 let ANALYSIS_CONTROLS_WIRED = false;
 const WEEKDAY_FILTER_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-const SENSOR_COLORS = { S1:'#58A6FF', S2:'#F59E0B' };
+const SENSOR_STYLES = {
+  S1:{ color:'#0077BB', dash:'solid', symbol:'circle', pattern:'' },
+  S2:{ color:'#CC3311', dash:'dash', symbol:'diamond', pattern:'/' },
+};
+const SENSOR_COLORS = {
+  S1:SENSOR_STYLES.S1.color,
+  S2:SENSOR_STYLES.S2.color,
+};
+
+function sensorChartStyle(sensor, index=0) {
+  return SENSOR_STYLES[sensor?.key]
+    || (index % 2 ? SENSOR_STYLES.S2 : SENSOR_STYLES.S1);
+}
 
 function finiteVals(arr) {
   return arr.filter(v => Number.isFinite(v));
@@ -3449,15 +3461,22 @@ function buildTimeSeries(divId, rows, cfg) {
   const overlay = readAnalysisSettings().sensorKey === 'overlay' && sensors.length > 1;
   let traces;
   if(overlay) {
-    traces = sensors.slice(0, 2).map(sensor => {
+    traces = sensors.slice(0, 2).map((sensor, index) => {
       const daily = dailyStats(rows.filter(row => sensorKeyForRow(row) === sensor.key));
+      const visual = sensorChartStyle(sensor, index);
       return {
         name:sensor.label,
         x:daily.dates,
         y:daily.means,
-        mode:'lines',
+        mode:'lines+markers',
         type:'scatter',
-        line:{color:SENSOR_COLORS[sensor.key] || cfg.cor, width:2.2},
+        line:{color:visual.color, width:2.8, dash:visual.dash},
+        marker:{
+          color:visual.color,
+          size:index ? 6 : 5,
+          symbol:visual.symbol,
+          line:{color:'#FFFFFF', width:0.8},
+        },
       };
     });
   } else {
@@ -3491,14 +3510,23 @@ function buildDiurnal(divId, rows, cfg) {
       sensor,
       hourly:hourlyStats(rows.filter(row => sensorKeyForRow(row) === sensor.key)),
     }));
-    traces = hourlyBySensor.map(({sensor, hourly}) => ({
-      name:sensor.label,
-      x:hourly.hours,
-      y:hourly.means,
-      mode:'lines',
-      type:'scatter',
-      line:{color:SENSOR_COLORS[sensor.key] || cfg.cor, width:2.2},
-    }));
+    traces = hourlyBySensor.map(({sensor, hourly}, index) => {
+      const visual = sensorChartStyle(sensor, index);
+      return {
+        name:sensor.label,
+        x:hourly.hours,
+        y:hourly.means,
+        mode:'lines+markers',
+        type:'scatter',
+        line:{color:visual.color, width:2.8, dash:visual.dash},
+        marker:{
+          color:visual.color,
+          size:index ? 6 : 5,
+          symbol:visual.symbol,
+          line:{color:'#FFFFFF', width:0.8},
+        },
+      };
+    });
     yRange = paddedRange(hourlyBySensor.flatMap(item => item.hourly.means));
   } else {
     const h = hourlyStats(rows);
@@ -3561,17 +3589,24 @@ function buildHistogram(divId, vals, cfg, rows=[]) {
   const sensors = datasetSensors(rows);
   const overlay = readAnalysisSettings().sensorKey === 'overlay' && sensors.length > 1;
   const traces = overlay
-    ? sensors.slice(0, 2).map(sensor => ({
-        x:rows
-          .filter(row => sensorKeyForRow(row) === sensor.key)
-          .map(row => row.v)
-          .filter(Number.isFinite),
-        type:'histogram',
-        nbinsx:42,
-        name:sensor.label,
-        opacity:0.58,
-        marker:{color:SENSOR_COLORS[sensor.key] || cfg.cor},
-      }))
+    ? sensors.slice(0, 2).map((sensor, index) => {
+        const visual = sensorChartStyle(sensor, index);
+        return {
+          x:rows
+            .filter(row => sensorKeyForRow(row) === sensor.key)
+            .map(row => row.v)
+            .filter(Number.isFinite),
+          type:'histogram',
+          nbinsx:42,
+          name:sensor.label,
+          opacity:0.64,
+          marker:{
+            color:visual.color,
+            line:{color:visual.color, width:1.2},
+            pattern:{shape:visual.pattern, solidity:0.24},
+          },
+        };
+      })
     : [{
         x:vals,
         type:'histogram',
