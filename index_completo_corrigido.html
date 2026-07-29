@@ -1759,6 +1759,110 @@
     .stat-card + .stat-card { border-top: 1px solid var(--border); }
     .param-stats { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Analysis workspace: intentionally compact after data loading. */
+  #app-section main {
+    display: grid;
+    gap: 18px;
+  }
+
+  #app-section .stats-bar {
+    margin-bottom: 0;
+  }
+
+  .analysis-controls.analysis-controls-compact {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
+    gap: 24px;
+    align-items: end;
+    padding: 22px 24px;
+    margin-bottom: 0;
+  }
+
+  .compact-control-group {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .compact-control-label {
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .compact-period {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .sensor-view-modes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    min-height: 48px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+  }
+
+  .sensor-mode-btn {
+    min-width: 0;
+    padding: 9px 12px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-2);
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .sensor-mode-btn:hover {
+    color: var(--text-1);
+  }
+
+  .sensor-mode-btn.active {
+    color: #07111d;
+    background: var(--accent);
+    font-weight: 600;
+  }
+
+  .panel-basic-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .panel .charts-grid-bottom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-empty-note {
+    padding: 28px;
+    color: var(--text-2);
+    text-align: center;
+  }
+
+  @media (max-width: 820px) {
+    .analysis-controls.analysis-controls-compact {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .panel-basic-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 520px) {
+    .compact-period,
+    .sensor-view-modes {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 </head>
 <body>
@@ -1906,9 +2010,9 @@
         <div class="sub">leituras brutas</div>
       </div>
       <div class="stat-card">
-        <div class="label">Parâmetros</div>
-        <div class="value" id="stat-params">—</div>
-        <div class="sub">disponíveis</div>
+        <div class="label">Sensores</div>
+        <div class="value" id="stat-sensors">—</div>
+        <div class="sub">na visualização</div>
       </div>
       <div class="stat-card">
         <div class="label">Cobertura</div>
@@ -1917,10 +2021,10 @@
       </div>
     </div>
 
-    <div class="insight-dashboard" id="insight-dashboard"></div>
-
-    <div class="analysis-controls" id="analysis-controls">
-      <div class="control-grid">
+    <div class="analysis-controls analysis-controls-compact" id="analysis-controls">
+      <div class="compact-control-group">
+        <div class="compact-control-label">Período exibido</div>
+        <div class="compact-period">
         <div class="field">
           <label for="filter-start">Inicio</label>
           <input id="filter-start" type="datetime-local" step="1"/>
@@ -1929,53 +2033,12 @@
           <label for="filter-end">Fim</label>
           <input id="filter-end" type="datetime-local" step="1"/>
         </div>
-        <div class="field">
-          <label for="hour-start">Hora inicial</label>
-          <select id="hour-start"></select>
-        </div>
-        <div class="field">
-          <label for="hour-end">Hora final</label>
-          <select id="hour-end"></select>
-        </div>
-        <div class="field">
-          <label for="stat-base">Base estatistica</label>
-          <select id="stat-base">
-            <option value="instant">Leituras instantaneas</option>
-            <option value="daily">Medias diarias</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="outlier-mode">Outliers</label>
-          <select id="outlier-mode">
-            <option value="none">Manter todos</option>
-            <option value="iqr">Remover por IQR</option>
-            <option value="p1p99">Remover P1-P99</option>
-            <option value="p5p95">Remover P5-P95</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="comparison-mode">Comparacao</label>
-          <select id="comparison-mode">
-            <option value="none">Sem comparacao</option>
-            <option value="halves">Primeira vs segunda metade</option>
-            <option value="weekday-weekend">Dias uteis vs fim de semana</option>
-          </select>
-        </div>
-        <div class="field" id="sensor-select-field" style="display:none">
-          <label for="analysis-sensor">Sensor da analise</label>
-          <select id="analysis-sensor"></select>
         </div>
       </div>
-      <div class="check-row" id="weekday-filters"></div>
-      <div class="param-filter-grid" id="param-filters"></div>
-      <div class="control-actions">
-        <label class="check-pill"><input type="checkbox" id="presentation-mode"/> Modo defesa</label>
-        <label class="check-pill"><input type="checkbox" id="graph-notes"/> Explicar graficos</label>
-        <div class="action-group">
-          <button class="btn btn-outline" type="button" onclick="resetAnalysisFilters()">Resetar filtros</button>
-          <button class="btn btn-outline" type="button" onclick="downloadNormalizedCsv()">Baixar CSV</button>
-          <button class="btn btn-outline" type="button" onclick="downloadNormalizedXlsx()">Baixar XLSX</button>
-        </div>
+      <div class="compact-control-group" id="sensor-select-field" hidden>
+        <div class="compact-control-label">Visualização dos sensores</div>
+        <div class="sensor-view-modes" id="sensor-view-modes" role="group" aria-label="Visualização dos sensores"></div>
+        <select id="analysis-sensor" hidden aria-hidden="true"></select>
       </div>
     </div>
 
@@ -2076,6 +2139,8 @@ const EXPORT_OPTIONS = [
   { key:'exceedance', label:'Excedências/limites', default:false },
 ];
 const EXPORT_CONTEXTS = {};
+const PANEL_RENDERERS = {};
+const RENDERED_PANELS = new Set();
 let CURRENT_DATASET = { rows: [], sourceLabel: '', totalRows: 0 };
 let CURRENT_VIEW_ROWS = [];
 let CURRENT_AVAILABLE_PARAMS = [];
@@ -2819,7 +2884,6 @@ function buildSensorComparisonHtml(col, cfg, comp=null, chartIds={}) {
 
 function setupAnalysisControls(rows, dMin, dMax, availParams) {
   CURRENT_AVAILABLE_PARAMS = availParams;
-  fillHourSelects();
 
   const start = document.getElementById('filter-start');
   const end = document.getElementById('filter-end');
@@ -2831,54 +2895,51 @@ function setupAnalysisControls(rows, dMin, dMax, availParams) {
     end.max = formatDateTimeInput(dMax);
     end.value = formatDateTimeInput(dMax);
   }
-  const hourStart = document.getElementById('hour-start');
-  const hourEnd = document.getElementById('hour-end');
-  if(hourStart) hourStart.value = '0';
-  if(hourEnd) hourEnd.value = '23';
-  const statBase = document.getElementById('stat-base');
-  const outlierMode = document.getElementById('outlier-mode');
-  const comparisonMode = document.getElementById('comparison-mode');
-  const graphNotes = document.getElementById('graph-notes');
-  const presentation = document.getElementById('presentation-mode');
   const sensorField = document.getElementById('sensor-select-field');
   const sensorSelect = document.getElementById('analysis-sensor');
-  if(statBase) statBase.value = 'instant';
-  if(outlierMode) outlierMode.value = 'none';
-  if(comparisonMode) comparisonMode.value = 'none';
-  if(graphNotes) graphNotes.checked = false;
-  if(presentation) presentation.checked = false;
-  document.body.classList.remove('presentation-mode');
 
   const sensors = datasetSensors(rows);
   CURRENT_DATASET.sensors = sensors;
   if(sensorField && sensorSelect) {
-    sensorField.style.display = sensors.length > 1 ? '' : 'none';
-    sensorSelect.innerHTML = sensors.map(sensor =>
-      `<option value="${sensor.key}">${sensor.label}</option>`
-    ).join('');
-    sensorSelect.value = sensors[0]?.key || 'S1';
-  }
-
-  const weekdays = document.getElementById('weekday-filters');
-  if(weekdays) {
-    weekdays.innerHTML = WEEKDAY_FILTER_LABELS.map((label, day) => `
-      <label class="check-pill">
-        <input type="checkbox" class="weekday-filter" value="${day}" checked/>
-        ${label}
-      </label>
-    `).join('');
-  }
-
-  const params = document.getElementById('param-filters');
-  if(params) {
-    params.innerHTML = availParams.map(([col, cfg]) => `
-      <label class="check-pill">
-        <input type="checkbox" class="param-filter" value="${col}" checked/>
-        <span class="tab-dot" style="background:${cfg.cor}"></span>${cfg.nome}
-      </label>
-    `).join('');
+    sensorField.hidden = sensors.length < 2;
+    sensorSelect.innerHTML = [
+      ...sensors.map(sensor => `<option value="${sensor.key}">${sensor.label}</option>`),
+      ...(sensors.length > 1 ? ['<option value="overlay">Sobrepostos</option>'] : []),
+    ].join('');
+    sensorSelect.value = sensors.length > 1 ? 'overlay' : (sensors[0]?.key || 'S1');
+    renderSensorModeButtons(sensors);
   }
   wireAnalysisControls();
+}
+
+function renderSensorModeButtons(sensors) {
+  const root = document.getElementById('sensor-view-modes');
+  const select = document.getElementById('analysis-sensor');
+  if(!root || !select || sensors.length < 2) return;
+  const modes = sensors.slice(0, 2).map((sensor, index) => ({
+    value:sensor.key,
+    label:`Sensor ${index + 1}`,
+    title:sensor.label,
+  }));
+  modes.push({value:'overlay', label:'Sobrepostos', title:'Exibir os dois sensores no mesmo gráfico'});
+  root.innerHTML = modes.map(mode => `
+    <button
+      type="button"
+      class="sensor-mode-btn${select.value === mode.value ? ' active' : ''}"
+      data-sensor-mode="${mode.value}"
+      title="${escapeHtml(mode.title)}"
+    >${mode.label}</button>
+  `).join('');
+  root.querySelectorAll('.sensor-mode-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      if(select.value === button.dataset.sensorMode) return;
+      select.value = button.dataset.sensorMode;
+      root.querySelectorAll('.sensor-mode-btn').forEach(item =>
+        item.classList.toggle('active', item === button)
+      );
+      renderCurrentView({preserveTab:true});
+    });
+  });
 }
 
 function wireAnalysisControls() {
@@ -2887,17 +2948,7 @@ function wireAnalysisControls() {
   const controls = document.getElementById('analysis-controls');
   if(!controls) return;
   controls.addEventListener('change', event => {
-    if(event.target?.id === 'presentation-mode') {
-      document.body.classList.toggle('presentation-mode', event.target.checked);
-      setTimeout(resizeActivePanelCharts, 160);
-      return;
-    }
     renderCurrentView({preserveTab:true});
-  });
-  controls.addEventListener('input', event => {
-    if(['filter-start', 'filter-end'].includes(event.target?.id)) {
-      renderCurrentView({preserveTab:true});
-    }
   });
 }
 
@@ -2934,7 +2985,9 @@ function readAnalysisSettings() {
 function applyDatasetFilters(rows) {
   const settings = readAnalysisSettings();
   return applyTemporalFilters(rows).filter(row =>
-    !hasMultipleSensors() || sensorKeyForRow(row) === settings.sensorKey
+    !hasMultipleSensors()
+      || settings.sensorKey === 'overlay'
+      || sensorKeyForRow(row) === settings.sensorKey
   );
 }
 
@@ -3243,6 +3296,8 @@ function renderCurrentView(options={}) {
   if(!CURRENT_DATASET.rows.length) return;
   const previousActive = options.preserveTab ? activeTab : null;
   Object.keys(EXPORT_CONTEXTS).forEach(key => delete EXPORT_CONTEXTS[key]);
+  Object.keys(PANEL_RENDERERS).forEach(key => delete PANEL_RENDERERS[key]);
+  RENDERED_PANELS.clear();
 
   const rows = applyDatasetFilters(CURRENT_DATASET.rows);
   CURRENT_VIEW_ROWS = rows;
@@ -3261,7 +3316,10 @@ function renderCurrentView(options={}) {
     document.getElementById('stat-days').textContent = 'sem dados no filtro';
   }
   document.getElementById('stat-rows').textContent = rows.length.toLocaleString('pt-BR');
-  document.getElementById('stat-params').textContent = params.length;
+  document.getElementById('stat-sensors').textContent =
+    readAnalysisSettings().sensorKey === 'overlay'
+      ? CURRENT_DATASET.sensors.length
+      : 1;
   const coverages = params.map(([k,cfg]) => rows.length ? filterParam(rows, k, cfg).length / rows.length : 0);
   document.getElementById('stat-coverage').textContent = `${(mean(coverages) * 100 || 0).toFixed(1)}%`;
   document.getElementById('file-info').textContent = `${CURRENT_DATASET.sourceLabel} | ${rows.length.toLocaleString('pt-BR')} registros no filtro`;
@@ -3377,15 +3435,32 @@ function refShapes(cfg, yref='y') {
 // BUILD CHARTS
 // ═══════════════════════════════════════════════════════════
 function buildTimeSeries(divId, rows, cfg) {
-  const d = dailyStats(rows);
   const {shapes,annotations} = refShapes(cfg);
-  const traces=[
-    { name:'Mín/Máx', x:[...d.dates,...[...d.dates].reverse()],
-      y:[...d.maxs,...[...d.mins].reverse()], fill:'toself', fillcolor:CHART_FILL_COLOR,
-      line:{color:'transparent'}, mode:'lines', type:'scatter', showlegend:true, hoverinfo:'skip' },
-    { name:'Média diária', x:d.dates, y:d.means, mode:'lines',
-      line:{color:CHART_MAIN_COLOR,width:2.2}, type:'scatter' },
-  ];
+  const sensors = datasetSensors(rows);
+  const overlay = readAnalysisSettings().sensorKey === 'overlay' && sensors.length > 1;
+  let traces;
+  if(overlay) {
+    traces = sensors.slice(0, 2).map(sensor => {
+      const daily = dailyStats(rows.filter(row => sensorKeyForRow(row) === sensor.key));
+      return {
+        name:sensor.label,
+        x:daily.dates,
+        y:daily.means,
+        mode:'lines',
+        type:'scatter',
+        line:{color:SENSOR_COLORS[sensor.key] || cfg.cor, width:2.2},
+      };
+    });
+  } else {
+    const d = dailyStats(rows);
+    traces = [
+      { name:'Mín/Máx', x:[...d.dates,...[...d.dates].reverse()],
+        y:[...d.maxs,...[...d.mins].reverse()], fill:'toself', fillcolor:CHART_FILL_COLOR,
+        line:{color:'transparent'}, mode:'lines', type:'scatter', showlegend:true, hoverinfo:'skip' },
+      { name:'Média diária', x:d.dates, y:d.means, mode:'lines',
+        line:{color:CHART_MAIN_COLOR,width:2.2}, type:'scatter' },
+    ];
+  }
   const layout={
     ...PLOT_LAYOUT_BASE, height:270, margin:{...PLOT_LAYOUT_BASE.margin, b:56},
     shapes, annotations,
@@ -3397,45 +3472,58 @@ function buildTimeSeries(divId, rows, cfg) {
 }
 
 function buildDiurnal(divId, rows, cfg) {
-  const h = hourlyStats(rows);
   const {shapes,annotations} = refShapes(cfg);
-
-  const yRange = paddedRange([
-    ...h.mins,
-    ...h.maxs,
-    ...h.means,
-    ...h.medians
-  ]);
-
-  const traces=[
-    {
-      name:'Mín/Máx',
-      x:[...h.hours,...[...h.hours].reverse()],
-      y:[...h.maxs,...[...h.mins].reverse()],
-      fill:'toself',
-      fillcolor:CHART_FILL_COLOR,
-      line:{color:'transparent'},
+  const sensors = datasetSensors(rows);
+  const overlay = readAnalysisSettings().sensorKey === 'overlay' && sensors.length > 1;
+  let traces;
+  let yRange;
+  if(overlay) {
+    const hourlyBySensor = sensors.slice(0, 2).map(sensor => ({
+      sensor,
+      hourly:hourlyStats(rows.filter(row => sensorKeyForRow(row) === sensor.key)),
+    }));
+    traces = hourlyBySensor.map(({sensor, hourly}) => ({
+      name:sensor.label,
+      x:hourly.hours,
+      y:hourly.means,
       mode:'lines',
       type:'scatter',
-      hoverinfo:'skip'
-    },
-    {
-      name:'Média',
-      x:h.hours,
-      y:h.means,
-      mode:'lines',
-      line:{color:CHART_MAIN_COLOR,width:2.2},
-      type:'scatter'
-    },
-    {
-      name:'Mediana',
-      x:h.hours,
-      y:h.medians,
-      mode:'lines',
-      line:{color:CHART_MEDIAN_COLOR,width:1.4,dash:'dot'},
-      type:'scatter'
-    },
-  ];
+      line:{color:SENSOR_COLORS[sensor.key] || cfg.cor, width:2.2},
+    }));
+    yRange = paddedRange(hourlyBySensor.flatMap(item => item.hourly.means));
+  } else {
+    const h = hourlyStats(rows);
+    yRange = paddedRange([...h.mins, ...h.maxs, ...h.means, ...h.medians]);
+    traces = [
+      {
+        name:'Mín/Máx',
+        x:[...h.hours,...[...h.hours].reverse()],
+        y:[...h.maxs,...[...h.mins].reverse()],
+        fill:'toself',
+        fillcolor:CHART_FILL_COLOR,
+        line:{color:'transparent'},
+        mode:'lines',
+        type:'scatter',
+        hoverinfo:'skip'
+      },
+      {
+        name:'Média',
+        x:h.hours,
+        y:h.means,
+        mode:'lines',
+        line:{color:CHART_MAIN_COLOR,width:2.2},
+        type:'scatter'
+      },
+      {
+        name:'Mediana',
+        x:h.hours,
+        y:h.medians,
+        mode:'lines',
+        line:{color:CHART_MEDIAN_COLOR,width:1.4,dash:'dot'},
+        type:'scatter'
+      },
+    ];
+  }
 
   const layout={
     ...PLOT_LAYOUT_BASE,
@@ -3459,21 +3547,33 @@ function buildDiurnal(divId, rows, cfg) {
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
 
-function buildHistogram(divId, vals, cfg) {
+function buildHistogram(divId, vals, cfg, rows=[]) {
   const st = computeStats(vals);
-  const traces=[
-    {
-      x:vals,
-      type:'histogram',
-      nbinsx:42,
-      name:'Frequência',
-      marker:{color:CHART_MAIN_COLOR, opacity:0.76, line:{color:'#FFFFFF', width:1}}
-    }
-  ];
+  const sensors = datasetSensors(rows);
+  const overlay = readAnalysisSettings().sensorKey === 'overlay' && sensors.length > 1;
+  const traces = overlay
+    ? sensors.slice(0, 2).map(sensor => ({
+        x:rows
+          .filter(row => sensorKeyForRow(row) === sensor.key)
+          .map(row => row.v)
+          .filter(Number.isFinite),
+        type:'histogram',
+        nbinsx:42,
+        name:sensor.label,
+        opacity:0.58,
+        marker:{color:SENSOR_COLORS[sensor.key] || cfg.cor},
+      }))
+    : [{
+        x:vals,
+        type:'histogram',
+        nbinsx:42,
+        name:'Frequência',
+        marker:{color:CHART_MAIN_COLOR, opacity:0.76, line:{color:'#FFFFFF', width:1}}
+      }];
   const layout={
     ...PLOT_LAYOUT_BASE,
     height:270,
-    shapes:[
+    shapes:overlay ? [] : [
       {type:'line', x0:st.mean, x1:st.mean, y0:0, y1:1, xref:'x', yref:'paper',
         line:{color:CHART_MEAN_COLOR, width:1.8, dash:'dash'}, name:`Média: ${fmt(st.mean)}`, showlegend:true},
       {type:'line', x0:st.median, x1:st.median, y0:0, y1:1, xref:'x', yref:'paper',
@@ -3483,6 +3583,7 @@ function buildHistogram(divId, vals, cfg) {
     xaxis:{...PLOT_LAYOUT_BASE.xaxis, title:{text:`${cfg.nome} (${cfg.unidade})`,font:{size:12}}},
     yaxis:{...PLOT_LAYOUT_BASE.yaxis, title:{text:'Frequência',font:{size:12}}},
     showlegend:true,
+    barmode:overlay ? 'overlay' : undefined,
   };
   Plotly.newPlot(divId, traces, layout, PLOT_CONFIG);
 }
@@ -3958,66 +4059,99 @@ function buildAdvancedStatsHtml(ctx) {
   `).join('');
 }
 
+function buildBasicPanelStats(col, cfg, analysisRows) {
+  const settings = readAnalysisSettings();
+  if(settings.sensorKey === 'overlay') {
+    const sensors = datasetSensors(analysisRows).slice(0, 2);
+    if(sensors.length === 2) {
+      const valuesBySensor = sensors.map(sensor =>
+        analysisRows
+          .filter(row => sensorKeyForRow(row) === sensor.key)
+          .map(row => row.v)
+          .filter(Number.isFinite)
+      );
+      const mean1 = mean(valuesBySensor[0]);
+      const mean2 = mean(valuesBySensor[1]);
+      const meanDiff = mean2 - mean1;
+      const relative = relativeComparisonIsUseful(col) && mean1
+        ? `${fmtSigned((meanDiff / Math.abs(mean1)) * 100, 1)}%`
+        : '—';
+      return `
+        <div class="pstat">
+          <div class="lbl">Média Sensor 1</div>
+          <div class="val">${fmt(mean1)} ${cfg.unidade}</div>
+        </div>
+        <div class="pstat">
+          <div class="lbl">Média Sensor 2</div>
+          <div class="val">${fmt(mean2)} ${cfg.unidade}</div>
+        </div>
+        <div class="pstat">
+          <div class="lbl">Diferença média S2-S1</div>
+          <div class="val">${fmtSigned(meanDiff)} ${cfg.unidade}</div>
+        </div>
+        <div class="pstat">
+          <div class="lbl">Diferença relativa</div>
+          <div class="val">${relative}</div>
+        </div>
+      `;
+    }
+  }
+
+  const st = computeStats(analysisRows.map(row => row.v));
+  return `
+    <div class="pstat">
+      <div class="lbl">N</div>
+      <div class="val">${st.n.toLocaleString('pt-BR')}</div>
+    </div>
+    <div class="pstat">
+      <div class="lbl">Média</div>
+      <div class="val">${fmt(st.mean)} ${cfg.unidade}</div>
+    </div>
+    <div class="pstat">
+      <div class="lbl">Mediana</div>
+      <div class="val">${fmt(st.median)} ${cfg.unidade}</div>
+    </div>
+    <div class="pstat">
+      <div class="lbl">Mín → Máx</div>
+      <div class="val">${fmt(st.min)} → ${fmt(st.max)}</div>
+    </div>
+  `;
+}
+
 function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRows=CURRENT_DATASET.totalRows) {
-  const vals = analysisRows.map(r=>r.v);
-  const st   = computeStats(vals);
-
+  const vals = analysisRows.map(row => row.v);
   const panelId = `panel-${col.replace(/\./g,'_')}`;
-  const ts  = `ts-${col.replace(/\./g,'_')}`;
-  const dp  = `dp-${col.replace(/\./g,'_')}`;
+  const ts = `ts-${col.replace(/\./g,'_')}`;
+  const dp = `dp-${col.replace(/\./g,'_')}`;
   const hist = `hist-${col.replace(/\./g,'_')}`;
-  const bp  = `bp-${col.replace(/\./g,'_')}`;
-  const sensorTime = `sensor-time-${col.replace(/\./g,'_')}`;
-  const sensorScatter = `sensor-scatter-${col.replace(/\./g,'_')}`;
-  const sensorBland = `sensor-bland-${col.replace(/\./g,'_')}`;
   const slug = col.toLowerCase().replace(/\./g,'-');
-  const ctx = { col, cfg, rows, analysisRows, vals, slug, totalRows, sourceLabel:CURRENT_DATASET.sourceLabel,
-    outlierInfo, statBase:readAnalysisSettings().statBase,
-    chartIds:{timeSeries:ts, diurnal:dp, histogram:hist, weekdayBoxplot:bp} };
+  const ctx = {
+    col,
+    cfg,
+    rows,
+    analysisRows,
+    vals,
+    slug,
+    totalRows,
+    sourceLabel:CURRENT_DATASET.sourceLabel,
+    outlierInfo,
+    statBase:'instant',
+    chartIds:{timeSeries:ts, diurnal:dp, histogram:hist},
+  };
   EXPORT_CONTEXTS[col] = ctx;
-
-  const refText = cfg.refs.length
-    ? `<div class="ref-bar">⚠ Referências destacadas: ${cfg.refs.map(r=>r.label).join('  ·  ')}</div>`
-    : '';
-  const advancedStats = buildAdvancedStatsHtml(ctx);
-  const summaryHtml = automaticSummaryHtml(col, cfg, analysisRows, rows, outlierInfo);
-  const comparisonHtml = buildComparisonHtml(analysisRows, cfg);
-  const notesClass = comparisonHtml ? 'analysis-note-grid' : 'analysis-note-grid analysis-note-grid-single';
-  const sensorComparison = sensorComparisonForParam(col, cfg);
-  const sensorComparisonHtml = buildSensorComparisonHtml(col, cfg, sensorComparison, {
-    time:sensorTime,
-    scatter:sensorScatter,
-    bland:sensorBland,
-  });
-  const explainerHtml = buildGraphExplainerHtml(analysisRows, rows, cfg);
 
   const container = document.getElementById('panels-container');
   const div = document.createElement('div');
-  div.id   = panelId;
+  div.id = panelId;
   div.className = 'panel';
   div.innerHTML = `
-    <div class="param-stats">
-      <div class="pstat"><div class="lbl">N</div><div class="val" style="color:${cfg.cor}">${st.n.toLocaleString('pt-BR')}</div></div>
-      <div class="pstat"><div class="lbl">Média</div><div class="val">${fmt(st.mean)}</div></div>
-      <div class="pstat"><div class="lbl">Mediana</div><div class="val">${fmt(st.median)}</div></div>
-      <div class="pstat"><div class="lbl">Desvio padrão</div><div class="val">${fmt(st.std)}</div></div>
-      <div class="pstat"><div class="lbl">Mín → Máx</div><div class="val" style="font-size:12px">${fmt(st.min)} → ${fmt(st.max)}</div></div>
-      <div class="pstat"><div class="lbl">P95</div><div class="val">${fmt(st.p95)}</div></div>
+    <div class="param-stats panel-basic-stats">
+      ${buildBasicPanelStats(col, cfg, analysisRows)}
     </div>
-    <details class="advanced-stats-details">
-      <summary>Métricas avançadas</summary>
-      <div class="advanced-stats-grid">${advancedStats}</div>
-    </details>
-    ${refText}
-    <div class="${notesClass}">
-      <div class="analysis-note">${summaryHtml}</div>
-      ${comparisonHtml}
-    </div>
-    ${sensorComparisonHtml}
     <div class="chart-card charts-grid-top">
       <div class="chart-topbar">
         <div class="chart-title">SÉRIE TEMPORAL — ${cfg.nome} (${cfg.unidade})</div>
-        <button class="chart-download" onclick="downloadChart('${ts}','${slug}-serie-temporal')">⬇ Baixar PNG</button>
+        <button class="chart-download" onclick="downloadChart('${ts}','${slug}-serie-temporal')">Baixar PNG</button>
       </div>
       <div id="${ts}"></div>
     </div>
@@ -4025,40 +4159,26 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
       <div class="chart-card">
         <div class="chart-topbar">
           <div class="chart-title">PERFIL DIURNO</div>
-          <button class="chart-download" onclick="downloadChart('${dp}','${slug}-perfil-diurno')">⬇ Baixar PNG</button>
+          <button class="chart-download" onclick="downloadChart('${dp}','${slug}-perfil-diurno')">Baixar PNG</button>
         </div>
         <div id="${dp}"></div>
       </div>
       <div class="chart-card">
         <div class="chart-topbar">
-          <div class="chart-title">HISTOGRAMA DE FREQUÊNCIAS</div>
-          <button class="chart-download" onclick="downloadChart('${hist}','${slug}-histograma-frequencias')">⬇ Baixar PNG</button>
+          <div class="chart-title">DISTRIBUIÇÃO</div>
+          <button class="chart-download" onclick="downloadChart('${hist}','${slug}-distribuicao')">Baixar PNG</button>
         </div>
         <div id="${hist}"></div>
       </div>
-      <div class="chart-card">
-        <div class="chart-topbar">
-          <div class="chart-title">COMPORTAMENTO POR DIA DA SEMANA</div>
-          <button class="chart-download" onclick="downloadChart('${bp}','${slug}-boxplot-semanal')">⬇ Baixar PNG</button>
-        </div>
-        <div id="${bp}"></div>
-      </div>
     </div>
-    ${explainerHtml}
   `;
   container.appendChild(div);
 
-  requestAnimationFrame(()=>{
+  PANEL_RENDERERS[col] = () => {
     buildTimeSeries(ts, rows, cfg);
     buildDiurnal(dp, rows, cfg);
-    buildHistogram(hist, vals, cfg);
-    buildBoxplot(bp, analysisRows, cfg);
-    if(sensorComparison?.stats) {
-      buildSensorTimeComparison(sensorTime, sensorComparison, cfg);
-      buildSensorScatter(sensorScatter, sensorComparison, cfg);
-      buildBlandAltman(sensorBland, sensorComparison, cfg);
-    }
-  });
+    buildHistogram(hist, vals, cfg, rows);
+  };
 
   return panelId;
 }
@@ -4067,6 +4187,20 @@ function buildPanel(col, cfg, rows, analysisRows=rows, outlierInfo=null, totalRo
 // TAB SYSTEM
 // ═══════════════════════════════════════════════════════════
 let activeTab = null;
+
+function renderPanelCharts(col) {
+  if(RENDERED_PANELS.has(col)) {
+    setTimeout(resizeActivePanelCharts, 80);
+    return;
+  }
+  const render = PANEL_RENDERERS[col];
+  if(!render) return;
+  requestAnimationFrame(() => {
+    render();
+    RENDERED_PANELS.add(col);
+    setTimeout(resizeActivePanelCharts, 80);
+  });
+}
 
 function resizeActivePanelCharts() {
   const active = document.querySelector('.panel.active');
@@ -4357,7 +4491,7 @@ function switchTab(col) {
   });
 
   activeTab = col;
-  setTimeout(resizeActivePanelCharts, 120);
+  renderPanelCharts(col);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4403,72 +4537,6 @@ function readWorkbook(file) {
     reader.onerror = () => reject(new Error('Erro ao ler o arquivo.'));
     reader.readAsArrayBuffer(file);
   });
-}
-
-function renderRows(rows, sourceLabel) {
-  if(!rows.length) throw new Error('Nenhuma linha válida encontrada.');
-
-  loadingMsg('Calculando estatísticas…');
-  const totalRows = rows.length;
-  CURRENT_DATASET = { rows, sourceLabel, totalRows };
-  Object.keys(EXPORT_CONTEXTS).forEach(key => delete EXPORT_CONTEXTS[key]);
-  const allDates = rows.map(r=>r._dt);
-  const dateRange = minMax(allDates);
-  if(!dateRange) throw new Error('Nenhuma data válida encontrada.');
-  const dMin = new Date(dateRange.min);
-  const dMax = new Date(dateRange.max);
-  const nDays = Math.round((dMax-dMin)/864e5)+1;
-
-  const availParams = Object.entries(PARAMS).filter(([k])=>rows.some(r=>r[k] != null));
-  if(!availParams.length) throw new Error("Nenhuma coluna de parâmetro reconhecida. Esperado: CO2, NOx, PM1, PM10, PM2.5, Pressao, Temp, Umid, VOC");
-
-  document.getElementById('stat-period').textContent =
-    `${fmtDate(dMin)} – ${fmtDate(dMax)}`;
-  document.getElementById('stat-days').textContent = `${nDays} dias`;
-  document.getElementById('stat-rows').textContent = totalRows.toLocaleString('pt-BR');
-  document.getElementById('stat-params').textContent = availParams.length;
-
-  const coverages = availParams.map(([k,cfg])=>{
-    const r = filterParam(rows, k, cfg);
-    return r.length / totalRows;
-  });
-  const avgCov = mean(coverages);
-  document.getElementById('stat-coverage').textContent = `${(avgCov*100).toFixed(1)}%`;
-  document.getElementById('file-info').textContent = sourceLabel;
-  const globalExportOptions = document.getElementById('global-export-options');
-  if(globalExportOptions) globalExportOptions.innerHTML = buildExportOptionsHtml('global');
-
-  document.getElementById('tabs-header').innerHTML='';
-  document.getElementById('panels-container').innerHTML='';
-
-  const tabsHeader = document.getElementById('tabs-header');
-  let isFirstPanel = true;
-  availParams.forEach(([col, cfg]) => {
-    loadingMsg(`Gerando painel: ${cfg.nome}…`);
-    const fRows = filterParam(rows, col, cfg);
-    if(fRows.length < 5) return;
-
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (isFirstPanel?' active':'');
-    btn.dataset.col = col;
-    btn.innerHTML = `<span class="tab-dot" style="background:${cfg.cor}"></span>${cfg.nome}`;
-    btn.onclick = ()=>switchTab(col);
-    tabsHeader.appendChild(btn);
-
-    const panelId = buildPanel(col, cfg, fRows);
-    if(isFirstPanel) {
-      activeTab=col;
-      setTimeout(()=>{ document.getElementById(panelId)?.classList.add('active'); },50);
-      isFirstPanel = false;
-    }
-  });
-
-  if(isFirstPanel) throw new Error('Os parâmetros reconhecidos têm menos de 5 leituras válidas.');
-
-  document.getElementById('upload-section').style.display='none';
-  document.getElementById('app-section').style.display='block';
-  setTimeout(resizeActivePanelCharts, 180);
-  hideLoading();
 }
 
 function renderRows(rows, sourceLabel) {
