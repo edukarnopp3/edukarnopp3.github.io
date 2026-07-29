@@ -1,0 +1,85 @@
+name: Sincronizacao diaria ISEQ
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+      timezone: "America/Sao_Paulo"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-iseq-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Importar o dia anterior
+        env:
+          BACKEND_URL: https://iseq-export-backend.onrender.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import time
+          import urllib.error
+          import urllib.request
+
+          backend_url = os.environ["BACKEND_URL"].rstrip("/")
+          cron_secret = os.environ.get("CRON_SECRET", "")
+          if len(cron_secret) < 32:
+              raise SystemExit("CRON_SECRET ausente ou menor que 32 caracteres.")
+
+          headers = {
+              "Content-Type": "application/json",
+              "X-Cron-Secret": cron_secret,
+          }
+
+          def request_json(path, method="GET", payload=None):
+              body = None if payload is None else json.dumps(payload).encode("utf-8")
+              request = urllib.request.Request(
+                  backend_url + path,
+                  data=body,
+                  headers=headers,
+                  method=method,
+              )
+              with urllib.request.urlopen(request, timeout=120) as response:
+                  return json.load(response)
+
+          result = request_json("/api/cron/daily-sync", method="POST", payload={})
+          jobs = {item["id"]: item for item in result["jobs"]}
+          print(
+              f"Sincronizacao de {result['target_date']} iniciada "
+              f"para {len(jobs)} sensor(es)."
+          )
+          if not jobs:
+              raise SystemExit("Nenhum sensor conectado foi encontrado.")
+
+          deadline = time.monotonic() + 80 * 60
+          while jobs and time.monotonic() < deadline:
+              for job_id in list(jobs):
+                  state = request_json(f"/api/cron/jobs/{job_id}")
+                  status = state["status"]
+                  print(
+                      f"{state['equipment_id']}: {status} "
+                      f"{state['completed_tasks']}/{state['total_tasks']}"
+                  )
+                  if status == "completed":
+                      jobs.pop(job_id)
+                  elif status in {"failed", "cancelled", "stale"}:
+                      print(state.get("message", "Importacao falhou."), file=sys.stderr)
+                      raise SystemExit(1)
+              if jobs:
+                  time.sleep(30)
+
+          if jobs:
+              raise SystemExit("Tempo limite excedido aguardando as importacoes.")
+          print("Sincronizacao diaria concluida.")
+          PY

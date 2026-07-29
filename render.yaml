@@ -13,11 +13,15 @@ services:
         sync: false
       - key: APP_SECRET
         generateValue: true
+      - key: CRON_SECRET
+        sync: false
       - key: APP_SESSION_HOURS
         value: "12"
       - key: ISEQ_STORAGE_DIR
         value: storage
       - key: ISEQ_JOB_WORKERS
+        value: "3"
+      - key: ISEQ_DAILY_WORKERS
         value: "3"
       - key: ISEQ_CHUNK_DAYS
         value: "1"

@@ -50,7 +50,9 @@ APP_SESSION_HOURS=12
 CORS_ORIGINS=https://edukarnopp3.github.io
 ISEQ_STORAGE_DIR=storage
 ISEQ_JOB_WORKERS=3
+ISEQ_DAILY_WORKERS=3
 ISEQ_CHUNK_DAYS=1
+CRON_SECRET=OUTRA_CHAVE_ALEATORIA_COM_32_OU_MAIS_CARACTERES
 ```
 
 No Render, `DATABASE_URL` é obrigatória. Sem ela, o endpoint de saúde continua respondendo, mas o login mostra que o banco persistente ainda não foi configurado.
@@ -67,6 +69,23 @@ No Render, `DATABASE_URL` é obrigatória. Sem ela, o endpoint de saúde continu
 - `GET /api/health`
 
 Todos os endpoints ISEQ, exceto o login, exigem a sessão do dashboard no cabeçalho `Authorization`.
+
+## Sincronizacao diaria
+
+O workflow `.github/workflows/daily-iseq-sync.yml` executa todos os dias as
+03:17 no fuso `America/Sao_Paulo`. Ele acorda o Render, importa o dia anterior
+para todos os sensores de contas ISEQ conectadas e acompanha os trabalhos ate
+o fim. Cada sensor usa tres requisicoes simultaneas, totalizando seis para os
+dois sensores atuais.
+
+Crie o mesmo segredo aleatorio, com pelo menos 32 caracteres, em dois lugares:
+
+1. Render: variavel de ambiente `CRON_SECRET`.
+2. GitHub: `Settings > Secrets and variables > Actions > New repository secret`,
+   tambem com o nome `CRON_SECRET`.
+
+O segredo nunca deve ser salvo diretamente no repositorio. Os endpoints
+`/api/cron/*` exigem o cabecalho `X-Cron-Secret`.
 
 ## Testes
 

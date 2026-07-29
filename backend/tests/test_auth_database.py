@@ -391,6 +391,99 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["detail"]["code"], "database_not_configured")
 
+    def test_daily_sync_requires_a_configured_secret(self) -> None:
+        with patch.dict("os.environ", {"CRON_SECRET": ""}):
+            response = self.client.post("/api/cron/daily-sync", json={})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "cron_not_configured")
+
+        with patch.dict("os.environ", {"CRON_SECRET": "a" * 40}):
+            response = self.client.post(
+                "/api/cron/daily-sync",
+                headers={"X-Cron-Secret": "b" * 40},
+                json={},
+            )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"]["code"], "cron_unauthorized")
+
+    def test_daily_sync_creates_one_job_per_connected_sensor(self) -> None:
+        token = self.login(profile_id=303)
+        equipment_response = self.client.get(
+            "/api/iseq/equipment",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(equipment_response.status_code, 200)
+        context = self.database.get_session(token)
+        self.assertIsNotNone(context)
+        self.database.save_sensors(
+            context.user_id,
+            [
+                {
+                    "mac": "AA:BB:CC:DD:EE:02",
+                    "location": "Sala 02",
+                    "label": "Sala 02",
+                }
+            ],
+        )
+
+        created: list[tuple[str, datetime, datetime, int, str]] = []
+
+        def fake_create_job(equipment_id, start, end, workers, user_id):
+            created.append((equipment_id, start, end, workers, user_id))
+            return JobState(
+                id=f"daily-{len(created)}",
+                user_id=user_id,
+                equipment_id=equipment_id,
+                start=start.isoformat(),
+                end=end.isoformat(),
+                total_tasks=9,
+                worker_count=workers,
+            )
+
+        with (
+            patch.dict(
+                "os.environ",
+                {"CRON_SECRET": "c" * 40, "ISEQ_DAILY_WORKERS": "3"},
+            ),
+            patch.object(self.store, "create_job", side_effect=fake_create_job),
+        ):
+            response = self.client.post(
+                "/api/cron/daily-sync",
+                headers={"X-Cron-Secret": "c" * 40},
+                json={"target_date": "2026-07-27"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["target_date"], "2026-07-27")
+        self.assertEqual(len(response.json()["jobs"]), 2)
+        self.assertEqual(
+            {item[0] for item in created},
+            {"AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"},
+        )
+        self.assertTrue(all(item[1] == datetime(2026, 7, 27) for item in created))
+        self.assertTrue(all(item[2] == datetime(2026, 7, 28) for item in created))
+        self.assertTrue(all(item[3] == 3 for item in created))
+        self.assertTrue(all(item[4] == context.user_id for item in created))
+
+    def test_daily_sync_job_status_is_protected(self) -> None:
+        self.store.jobs["daily-status"] = JobState(
+            id="daily-status",
+            user_id="user",
+            equipment_id="AA:BB:CC:DD:EE:01",
+            start="2026-07-27T00:00:00",
+            end="2026-07-28T00:00:00",
+            status="running",
+        )
+        with patch.dict("os.environ", {"CRON_SECRET": "d" * 40}):
+            anonymous = self.client.get("/api/cron/jobs/daily-status")
+            authorized = self.client.get(
+                "/api/cron/jobs/daily-status",
+                headers={"X-Cron-Secret": "d" * 40},
+            )
+        self.assertEqual(anonymous.status_code, 401)
+        self.assertEqual(authorized.status_code, 200)
+        self.assertEqual(authorized.json()["status"], "running")
+
 
 class JobAuthenticationFailureTests(unittest.TestCase):
     def test_expired_iseq_token_stops_job_without_retrying(self) -> None:

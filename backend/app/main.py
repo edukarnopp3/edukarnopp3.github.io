@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime, time as datetime_time, timedelta
 import os
+import secrets
 import threading
 import time
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +24,7 @@ DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:8000,http://localhost:8000"
 )
 STORAGE_DIR = os.getenv("ISEQ_STORAGE_DIR", "storage")
+DAILY_SYNC_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 
 def configured_origins() -> list[str]:
@@ -71,6 +74,10 @@ class JobRequest(BaseModel):
     start: datetime
     end: datetime
     workers: int | None = Field(default=None, ge=1, le=6)
+
+
+class DailySyncRequest(BaseModel):
+    target_date: date | None = None
 
 
 class LoginLimiter:
@@ -142,6 +149,20 @@ def require_hosted_security_configuration() -> None:
             "app_secret_not_configured",
             "A chave de segurança do backend ainda não foi configurada.",
         )
+
+
+def require_cron_secret(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+) -> None:
+    configured_secret = os.getenv("CRON_SECRET", "")
+    if len(configured_secret) < 32:
+        raise api_error(
+            503,
+            "cron_not_configured",
+            "A rotina diaria ainda nao foi configurada no backend.",
+        )
+    if not x_cron_secret or not secrets.compare_digest(x_cron_secret, configured_secret):
+        raise api_error(401, "cron_unauthorized", "Chave da rotina diaria invalida.")
 
 
 def is_iseq_auth_error(message: str) -> bool:
@@ -313,3 +334,50 @@ def get_job_data(
     if job.status != "completed":
         raise api_error(409, "job_not_completed", "A importação ainda não foi concluída.")
     return {"rows": store.get_data(job_id)}
+
+
+@app.post("/api/cron/daily-sync")
+def start_daily_sync(
+    payload: DailySyncRequest | None = None,
+    _authorized: None = Depends(require_cron_secret),
+) -> dict[str, object]:
+    target_date = (
+        payload.target_date
+        if payload and payload.target_date
+        else datetime.now(DAILY_SYNC_TIMEZONE).date() - timedelta(days=1)
+    )
+    period_start = datetime.combine(target_date, datetime_time.min)
+    period_end = period_start + timedelta(days=1)
+    try:
+        configured_workers = int(os.getenv("ISEQ_DAILY_WORKERS", "3"))
+    except ValueError:
+        configured_workers = 3
+    workers_per_sensor = max(1, min(configured_workers, 3))
+
+    jobs = [
+        store.create_job(
+            target.equipment_id,
+            period_start,
+            period_end,
+            workers=workers_per_sensor,
+            user_id=target.user_id,
+        )
+        for target in database.list_daily_sync_targets()
+    ]
+    return {
+        "target_date": target_date.isoformat(),
+        "period_start": period_start.isoformat(timespec="seconds"),
+        "period_end": period_end.isoformat(timespec="seconds"),
+        "jobs": [asdict(job) for job in jobs],
+    }
+
+
+@app.get("/api/cron/jobs/{job_id}")
+def get_daily_sync_job(
+    job_id: str,
+    _authorized: None = Depends(require_cron_secret),
+) -> dict[str, object]:
+    job = store.get_job(job_id)
+    if not job:
+        raise api_error(404, "job_not_found", "Importacao nao encontrada.")
+    return asdict(job)

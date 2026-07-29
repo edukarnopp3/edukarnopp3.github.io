@@ -178,6 +178,13 @@ class SessionContext:
         }
 
 
+@dataclass(frozen=True)
+class SyncTarget:
+    user_id: str
+    equipment_id: str
+    label: str
+
+
 class TokenCipher:
     def __init__(self, secret: str):
         digest = hashlib.sha256(secret.encode("utf-8")).digest()
@@ -356,6 +363,23 @@ class DatabaseStore:
                 )
             )
             return sensor is not None
+
+    def list_daily_sync_targets(self) -> list[SyncTarget]:
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(Sensor.user_id, Sensor.mac, Sensor.label)
+                .join(IseqConnection, IseqConnection.user_id == Sensor.user_id)
+                .where(IseqConnection.status == "connected")
+                .order_by(Sensor.user_id, Sensor.mac)
+            ).all()
+        return [
+            SyncTarget(
+                user_id=str(user_id),
+                equipment_id=str(mac),
+                label=str(label or mac),
+            )
+            for user_id, mac, label in rows
+        ]
 
     def save_import_job(self, state: dict[str, object]) -> None:
         with Session(self.engine) as session:
@@ -642,6 +666,7 @@ class DatabaseStore:
             "sensors",
             "import_jobs",
             "readings",
+            "sensor_coverage",
         )
         with self.engine.begin() as connection:
             for table_name in table_names:
