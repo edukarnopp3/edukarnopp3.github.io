@@ -4,6 +4,15 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Monitor de Qualidade do Ar</title>
+<script>
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem('airqualityTheme') === 'light'
+      ? 'light'
+      : 'dark';
+  } catch(_error) {
+    document.documentElement.dataset.theme = 'dark';
+  }
+</script>
 
 <!-- SheetJS & Plotly -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -35,6 +44,21 @@
     --radius: var(--radius-lg);
     --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg: #F5F5F7;
+    --surface: #FFFFFF;
+    --surface-2: #F0F1F3;
+    --surface2: var(--surface-2);
+    --border: rgba(0,0,0,.08);
+    --border-strong: rgba(0,0,0,.16);
+    --text-1: #1D1D1F;
+    --text-2: #6E6E73;
+    --text-3: #98989D;
+    --text: var(--text-1);
+    --muted: var(--text-2);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -825,6 +849,27 @@
   /* Clean product interface */
   html { color-scheme: dark; }
 
+  html[data-theme="light"] header {
+    background: rgba(245,245,247,.94);
+  }
+
+  html[data-theme="light"] .source-tab.active {
+    background: rgba(0,0,0,.06);
+  }
+
+  html[data-theme="light"] .comparison-cell {
+    background: rgba(0,0,0,.025);
+  }
+
+  html[data-theme="light"] .status-progress {
+    background: rgba(0,0,0,.08);
+  }
+
+  html[data-theme="light"] #toast {
+    background: #FFF4F4;
+    color: #A82B2B;
+  }
+
   body {
     background: var(--bg);
     color: var(--text-1);
@@ -938,6 +983,11 @@
     padding: 0 10px;
     font-size: 11px;
     font-weight: 500;
+  }
+
+  .theme-toggle {
+    flex-shrink: 0;
+    font-size: 15px;
   }
 
   #login-section {
@@ -1690,6 +1740,7 @@
   }
 
   @media(max-width: 560px) {
+    .badge { display: none; }
     .brand-copy p { display: none; }
     .source-grid { padding: 22px 16px; }
 
@@ -1739,6 +1790,7 @@
       </label>
       <button class="icon-button logout-button" id="logout-button" type="button" title="Sair" aria-label="Sair">Sair</button>
     </div>
+    <button class="icon-button theme-toggle" id="theme-toggle" type="button" title="Ativar modo claro" aria-label="Ativar modo claro" aria-pressed="false">☀</button>
   </div>
 </header>
 
@@ -4816,6 +4868,31 @@ function setupSourceInterface() {
   setSourceMode(document.querySelector('.source-grid')?.dataset.sourceMode || 'iseq');
 }
 
+function setTheme(theme, persist=true) {
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = nextTheme;
+  const button = document.getElementById('theme-toggle');
+  if(button) {
+    const lightMode = nextTheme === 'light';
+    const actionLabel = lightMode ? 'Ativar modo escuro' : 'Ativar modo claro';
+    button.textContent = lightMode ? '☾' : '☀';
+    button.title = actionLabel;
+    button.setAttribute('aria-label', actionLabel);
+    button.setAttribute('aria-pressed', lightMode ? 'true' : 'false');
+  }
+  if(persist) {
+    try {
+      localStorage.setItem('airqualityTheme', nextTheme);
+    } catch(_error) {
+      // O tema continua ativo na sessão mesmo quando o armazenamento é bloqueado.
+    }
+  }
+}
+
+function toggleTheme() {
+  setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+}
+
 // ═══════════════════════════════════════════════════════════
 // UI HELPERS
 // ═══════════════════════════════════════════════════════════
@@ -4846,6 +4923,7 @@ setIseqStatus(`Usando ${backendModeLabel()}: ${getBackendUrl()}`, '');
 setupSourceInterface();
 document.getElementById('login-form').addEventListener('submit', submitIseqLogin);
 document.getElementById('logout-button').addEventListener('click', logoutSession);
+document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
 document.getElementById('iseq-form').addEventListener('submit', startIseqJob);
 document.getElementById('environment-1')?.addEventListener('change', () => {
   const env1 = document.getElementById('environment-1');
@@ -4856,6 +4934,7 @@ document.getElementById('environment-1')?.addEventListener('change', () => {
   updateEnvironmentMacLabels();
 });
 document.getElementById('environment-2')?.addEventListener('change', updateEnvironmentMacLabels);
+setTheme(document.documentElement.dataset.theme, false);
 initializeAuthentication();
 
 // Drag-and-drop
