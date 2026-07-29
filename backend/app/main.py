@@ -8,9 +8,10 @@ import threading
 import time
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from starlette.middleware.gzip import GZipMiddleware
 
 from .collector import ApiReportCollector, IseqAuthenticationError, authenticate_iseq
 from .database import DatabaseStore, SessionContext
@@ -62,6 +63,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1_000, compresslevel=5)
 
 
 class LoginRequest(BaseModel):
@@ -326,6 +328,8 @@ def get_job(
 @app.get("/api/iseq/jobs/{job_id}/data")
 def get_job_data(
     job_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int | None = Query(default=None, ge=1, le=25_000),
     session: SessionContext = Depends(require_session),
 ) -> dict[str, object]:
     job = store.get_job(job_id)
@@ -333,7 +337,12 @@ def get_job_data(
         raise api_error(404, "job_not_found", "Importação não encontrada.")
     if job.status != "completed":
         raise api_error(409, "job_not_completed", "A importação ainda não foi concluída.")
-    return {"rows": store.get_data(job_id)}
+    rows = store.get_data(job_id, offset=offset, limit=limit)
+    return {
+        "rows": rows,
+        "offset": offset,
+        "has_more": limit is not None and len(rows) == limit,
+    }
 
 
 @app.post("/api/cron/daily-sync")

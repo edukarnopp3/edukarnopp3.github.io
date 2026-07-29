@@ -2206,6 +2206,11 @@ function normalizeIseqLongRows(raw) {
 
 function normalizeCombinedRows(rows) {
   const byTime = new Map();
+  addCombinedRows(byTime, rows);
+  return [...byTime.values()].sort((a,b)=>a._dt-b._dt);
+}
+
+function addCombinedRows(byTime, rows) {
   rows.forEach(r => {
     const dt = r._dt || parseLocalDate(r.data_local);
     if (!dt) return;
@@ -2217,7 +2222,6 @@ function normalizeCombinedRows(rows) {
     });
     byTime.set(key, row);
   });
-  return [...byTime.values()].sort((a,b)=>a._dt-b._dt);
 }
 
 function findValue(row, labels) {
@@ -4734,8 +4738,20 @@ async function pollIseqJob(backendUrl, jobId, sensorLabel='Sensor') {
   }
 
   showLoading('Baixando dados normalizados…');
-  const payload = await fetchJson(`${backendUrl}/api/iseq/jobs/${jobId}/data`);
-  return normalizeCombinedRows((payload.rows || []).map(r => ({...r, _dt:parseLocalDate(r.data_local)})));
+  const pageSize = 10_000;
+  const byTime = new Map();
+  let offset = 0;
+  while(true) {
+    showLoading(`Baixando dados normalizados… ${offset.toLocaleString('pt-BR')} leituras`);
+    const payload = await fetchJson(
+      `${backendUrl}/api/iseq/jobs/${jobId}/data?offset=${offset}&limit=${pageSize}`
+    );
+    const pageRows = Array.isArray(payload.rows) ? payload.rows : [];
+    addCombinedRows(byTime, pageRows);
+    offset += pageRows.length;
+    if(pageRows.length < pageSize) break;
+  }
+  return [...byTime.values()].sort((a,b)=>a._dt-b._dt);
 }
 
 function normalizeInputDate(value) {

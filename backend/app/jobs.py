@@ -79,6 +79,8 @@ class JobRepository(Protocol):
         equipment_id: str,
         start: datetime,
         end: datetime,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> list[dict[str, object]]: ...
     def save_coverage(
         self,
@@ -176,7 +178,12 @@ class JobStore:
                 return job
         return self._load_job(job_id)
 
-    def get_data(self, job_id: str) -> list[dict[str, object]]:
+    def get_data(
+        self,
+        job_id: str,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[dict[str, object]]:
         job = self.get_job(job_id)
         if not job:
             return []
@@ -186,6 +193,8 @@ class JobStore:
                 job.equipment_id,
                 datetime.fromisoformat(job.start),
                 datetime.fromisoformat(job.end),
+                offset=offset,
+                limit=limit,
             )
             if rows:
                 return rows
@@ -194,7 +203,8 @@ class JobStore:
         data_path = Path(job.data_file)
         if not data_path.exists():
             return []
-        return json.loads(data_path.read_text(encoding="utf-8"))
+        rows = json.loads(data_path.read_text(encoding="utf-8"))
+        return rows[offset:] if limit is None else rows[offset:offset + limit]
 
     def list_equipment(self, user_id: str = "legacy") -> list[dict[str, str]]:
         return self.collector_factory(user_id).list_equipment()

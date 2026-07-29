@@ -129,6 +129,16 @@ class DatabaseStoreTests(unittest.TestCase):
         self.assertEqual(rows[0]["CO2"], 478.0)
         self.assertEqual(rows[0]["PM2.5"], 3.0)
 
+        paginated_rows = self.database.get_readings(
+            user_id,
+            equipment[0]["mac"],
+            datetime(2026, 3, 1),
+            datetime(2026, 3, 2),
+            offset=0,
+            limit=1,
+        )
+        self.assertEqual(paginated_rows, rows)
+
         self.database.save_readings(
             user_id,
             equipment[0]["mac"],
@@ -357,6 +367,48 @@ class AuthApiTests(unittest.TestCase):
         expired_response = self.client.get("/api/auth/session", headers=headers)
         self.assertEqual(expired_response.status_code, 401)
         self.assertEqual(expired_response.json()["detail"]["code"], "session_invalid")
+
+    def test_completed_job_data_can_be_downloaded_in_pages(self) -> None:
+        token = self.login(profile_id=303)
+        headers = {"Authorization": f"Bearer {token}"}
+        context = self.database.get_session(token)
+        self.assertIsNotNone(context)
+        equipment_id = "AA:BB:CC:DD:EE:01"
+        start = datetime(2026, 3, 1)
+        end = datetime(2026, 3, 2)
+        self.database.save_readings(
+            context.user_id,
+            equipment_id,
+            "paged-job",
+            [
+                {"data_local": "2026-03-01T00:00:00", "CO2": 450},
+                {"data_local": "2026-03-01T00:01:00", "CO2": 460},
+                {"data_local": "2026-03-01T00:02:00", "CO2": 470},
+            ],
+        )
+        self.store.jobs["paged-job"] = JobState(
+            id="paged-job",
+            user_id=context.user_id,
+            equipment_id=equipment_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+            status="completed",
+        )
+
+        first_page = self.client.get(
+            "/api/iseq/jobs/paged-job/data?offset=0&limit=2",
+            headers=headers,
+        )
+        second_page = self.client.get(
+            "/api/iseq/jobs/paged-job/data?offset=2&limit=2",
+            headers=headers,
+        )
+
+        self.assertEqual(first_page.status_code, 200, first_page.text)
+        self.assertEqual([row["CO2"] for row in first_page.json()["rows"]], [450.0, 460.0])
+        self.assertTrue(first_page.json()["has_more"])
+        self.assertEqual([row["CO2"] for row in second_page.json()["rows"]], [470.0])
+        self.assertFalse(second_page.json()["has_more"])
 
     def test_jobs_are_isolated_by_user(self) -> None:
         first_token = self.login(profile_id=101)

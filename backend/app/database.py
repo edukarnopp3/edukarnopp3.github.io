@@ -481,6 +481,8 @@ class DatabaseStore:
         equipment_id: str,
         start: datetime,
         end: datetime,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> list[dict[str, object]]:
         with Session(self.engine) as session:
             sensor = session.scalar(
@@ -491,7 +493,7 @@ class DatabaseStore:
             )
             if not sensor:
                 return []
-            readings = session.scalars(
+            statement = (
                 select(Reading)
                 .where(
                     Reading.sensor_id == sensor.id,
@@ -499,7 +501,11 @@ class DatabaseStore:
                     Reading.recorded_at <= end,
                 )
                 .order_by(Reading.recorded_at)
-            ).all()
+                .offset(max(0, offset))
+            )
+            if limit is not None:
+                statement = statement.limit(max(1, limit))
+            readings = session.scalars(statement).all()
             return [self._reading_to_row(reading) for reading in readings]
 
     def save_coverage(
