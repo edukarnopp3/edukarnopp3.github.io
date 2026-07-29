@@ -1,0 +1,27 @@
+name: Manter Render ativo durante importacao
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-render-awake
+  cancel-in-progress: true
+
+jobs:
+  keep-awake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 125
+    steps:
+      - name: Manter backend acordado por duas horas
+        shell: bash
+        run: |
+          for attempt in $(seq 1 240); do
+            curl --fail --silent --show-error \
+              --max-time 120 \
+              https://iseq-export-backend.onrender.com/api/health
+            echo
+            sleep 30
+          done
