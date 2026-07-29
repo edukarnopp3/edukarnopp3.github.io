@@ -2349,7 +2349,13 @@ function localIso(dt) {
 }
 
 function filterParam(rows, col, cfg) {
-  return rows.map(r=>({dt:r._dt, v:parseFloat(r[col])}))
+  return rows.map(r=>({
+    dt:r._dt,
+    v:parseFloat(r[col]),
+    _sensorKey:r._sensorKey,
+    _sensorLabel:r._sensorLabel,
+    _equipmentId:r._equipmentId,
+  }))
     .filter(r=>!isNaN(r.v))
     .filter(r=>cfg.vmin===null||r.v>=cfg.vmin)
     .filter(r=>cfg.vmax===null||r.v<=cfg.vmax);
