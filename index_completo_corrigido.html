@@ -4738,7 +4738,7 @@ async function pollIseqJob(backendUrl, jobId, sensorLabel='Sensor') {
   }
 
   showLoading('Baixando dados normalizados…');
-  const pageSize = 10_000;
+  const pageSize = 25_000;
   const byTime = new Map();
   let offset = 0;
   while(true) {
