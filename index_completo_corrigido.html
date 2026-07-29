@@ -12,19 +12,29 @@
 
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 
 <style>
   /* ─── Variables ─────────────────────────────────────────── */
   :root {
-    --bg:        #0D1117;
-    --surface:   #161B22;
-    --surface2:  #1C2333;
-    --border:    #30363D;
-    --text:      #E6EDF3;
-    --muted:     #7D8590;
-    --accent:    #58A6FF;
-    --radius:    10px;
+    --bg: #0A0A0B;
+    --surface: #121214;
+    --surface-2: #18191C;
+    --surface2: var(--surface-2);
+    --border: rgba(255,255,255,.08);
+    --border-strong: rgba(255,255,255,.16);
+    --text-1: #F1F1F2;
+    --text-2: #8B8D93;
+    --text-3: #57585D;
+    --text: var(--text-1);
+    --muted: var(--text-2);
+    --accent: #4A9EFF;
+    --accent-soft: rgba(74,158,255,.12);
+    --radius-lg: 14px;
+    --radius-md: 9px;
+    --radius: var(--radius-lg);
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -52,7 +62,7 @@
   }
   header .logo {
     width: 36px; height: 36px;
-    background: linear-gradient(135deg, #58A6FF 0%, #1F6FEB 100%);
+    background: var(--accent);
     border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     font-size: 18px; flex-shrink: 0;
@@ -306,7 +316,7 @@
     height: 100%;
     width: 0%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--accent), #79C0FF);
+    background: var(--accent);
     transition: width 0.35s ease;
   }
   .status-detail {
@@ -811,6 +821,893 @@
       align-items: flex-start;
     }
   }
+
+  /* Clean product interface */
+  html { color-scheme: dark; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+    letter-spacing: 0;
+  }
+
+  header {
+    min-height: 68px;
+    padding: 14px clamp(20px, 3vw, 40px);
+    gap: 12px;
+    background: rgba(10,10,11,.94);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(14px);
+  }
+
+  header .logo {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-md);
+    background: var(--accent);
+    color: #07111D;
+    font-size: 0;
+    font-weight: 600;
+  }
+
+  header .logo span {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  header h1 {
+    color: var(--text-1);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  header p {
+    color: var(--text-3);
+    font-size: 11px;
+    margin-top: 0;
+  }
+
+  .header-right {
+    gap: 14px;
+  }
+
+  .badge {
+    order: 2;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  .account-summary {
+    gap: 8px;
+    padding-right: 14px;
+    border-right: 1px solid var(--border);
+  }
+
+  .account-summary::before {
+    content: '';
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+
+  .account-name {
+    max-width: 170px;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+
+  .icon-button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+
+  .icon-button:hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    color: var(--text-1);
+  }
+
+  .logout-button {
+    width: auto;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  #login-section {
+    min-height: calc(100vh - 68px);
+    padding: 48px 20px;
+  }
+
+  .login-panel {
+    width: min(420px, 100%);
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .login-kicker {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    margin-bottom: 14px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .login-panel h2 {
+    margin-bottom: 8px;
+    color: var(--text-1);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .login-panel > p {
+    margin-bottom: 24px;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+
+  .login-form {
+    gap: 16px;
+  }
+
+  .field label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .field input,
+  .field select {
+    min-height: 44px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-1);
+    font-family: var(--font-ui);
+    font-size: 13px;
+  }
+
+  .field input::placeholder { color: var(--text-3); }
+
+  .field input:hover,
+  .field select:hover {
+    border-color: var(--border-strong);
+  }
+
+  .field input:focus,
+  .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .sensor-id {
+    overflow: hidden;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn {
+    min-height: 42px;
+    justify-content: center;
+    padding: 10px 18px;
+    background: var(--accent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: #07111D;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    transition: background .15s ease, opacity .15s ease;
+  }
+
+  .btn:hover {
+    background: #65ACFF;
+    opacity: 1;
+  }
+
+  .btn-outline,
+  .chart-download {
+    min-height: 36px;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .btn-outline:hover,
+  .chart-download:hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    color: var(--text-1);
+  }
+
+  .login-form .btn {
+    width: 100%;
+    margin-top: 2px;
+  }
+
+  .login-error {
+    margin-top: 16px;
+    padding: 11px 12px;
+    background: rgba(255,99,99,.08);
+    border: 1px solid rgba(255,99,99,.24);
+    border-radius: var(--radius-md);
+    color: #FFAAAA;
+  }
+
+  #upload-section {
+    min-height: calc(100vh - 68px);
+    align-items: center;
+    justify-content: flex-start;
+    padding: clamp(28px, 5vw, 64px) 20px 64px;
+  }
+
+  .source-grid {
+    display: block;
+    width: min(780px, 100%);
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .source-switcher {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    width: min(320px, 100%);
+    margin-bottom: 30px;
+    padding: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .source-tab {
+    min-height: 34px;
+    padding: 7px 12px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .source-tab:hover { color: var(--text-1); }
+
+  .source-tab.active {
+    background: rgba(255,255,255,.08);
+    color: var(--text-1);
+  }
+
+  .source-grid[data-source-mode="iseq"] .upload-card,
+  .source-grid[data-source-mode="upload"] .iseq-panel {
+    display: none;
+  }
+
+  .source-panel,
+  .upload-card {
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .upload-card {
+    max-width: none;
+    cursor: default;
+    text-align: left;
+  }
+
+  .upload-card:hover,
+  .upload-card.drag {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .upload-card.drag {
+    outline: 1px solid var(--accent);
+    outline-offset: 14px;
+    border-radius: var(--radius-md);
+  }
+
+  .upload-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 18px;
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .upload-card h2,
+  .iseq-panel h2 {
+    margin-bottom: 7px;
+    color: var(--text-1);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .upload-card p,
+  .iseq-panel p {
+    margin-bottom: 24px;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+
+  .upload-card .btn {
+    width: auto;
+    min-width: 150px;
+  }
+
+  .format-hint {
+    margin: 14px 0 0 !important;
+    color: var(--text-3) !important;
+    font-family: var(--font-ui);
+    font-size: 11px !important;
+  }
+
+  .iseq-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 16px;
+  }
+
+  .iseq-actions {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    justify-content: initial;
+    gap: 10px;
+    margin-top: 4px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .iseq-actions .btn { min-width: 132px; }
+
+  .parameter-chips {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .parameter-chips span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .status-footer {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .status-indicator {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-3);
+  }
+
+  .status-footer:has(.status-box.error) .status-indicator { background: #FF6B6B; }
+  .status-footer:has(.status-progress) .status-indicator { background: var(--accent); }
+  .status-footer:has(.status-box.done) .status-indicator { background: #54C68A; }
+
+  .status-box {
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: var(--text-2);
+    font-size: 11px;
+  }
+
+  .status-box.error,
+  .status-box.done {
+    background: transparent;
+    border: 0;
+  }
+
+  .status-box.error { color: #FFAAAA; }
+  .status-box.done { color: var(--text-2); }
+
+  .status-title {
+    margin-bottom: 7px;
+    color: var(--text-1);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .status-percent,
+  .status-detail {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+  }
+
+  .status-progress {
+    height: 4px;
+    margin-bottom: 7px;
+    background: rgba(255,255,255,.08);
+    border-radius: 2px;
+  }
+
+  .status-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .backend-details {
+    position: relative;
+    color: var(--text-3);
+    font-size: 10px;
+  }
+
+  .backend-details summary {
+    color: var(--text-3);
+    cursor: pointer;
+    list-style: none;
+    white-space: nowrap;
+  }
+
+  .backend-details summary::-webkit-details-marker { display: none; }
+
+  .backend-details[open] {
+    grid-column: 2 / -1;
+    width: 100%;
+    padding-top: 4px;
+  }
+
+  .backend-details code {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    overflow-wrap: anywhere;
+  }
+
+  main {
+    max-width: 1440px;
+    padding: 32px clamp(18px, 3vw, 40px) 64px;
+  }
+
+  .stats-bar {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-bottom: 18px;
+    padding: 6px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .stat-card {
+    padding: 16px 20px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .stat-card + .stat-card { border-left: 1px solid var(--border); }
+
+  .stat-card .label,
+  .insight-card .label {
+    margin-bottom: 6px;
+    color: var(--text-2);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .stat-card .value,
+  .insight-card .value {
+    color: var(--text-1);
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  .stat-card .sub,
+  .insight-card .sub {
+    color: var(--text-3);
+    font-size: 10px;
+  }
+
+  .insight-dashboard {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .insight-card {
+    min-height: 86px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .analysis-controls {
+    margin-bottom: 18px;
+    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .control-grid {
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+    gap: 14px;
+  }
+
+  .check-row,
+  .param-filter-grid,
+  .control-actions {
+    gap: 7px;
+    margin-top: 14px;
+  }
+
+  .check-pill {
+    min-height: 30px;
+    padding: 6px 9px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text-2);
+    font-size: 11px;
+  }
+
+  .check-pill:hover {
+    border-color: var(--border-strong);
+    color: var(--text-1);
+  }
+
+  .check-pill input { accent-color: var(--accent); }
+
+  .control-actions {
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .tabs-wrapper {
+    margin-bottom: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .tabs-header { border-bottom: 1px solid var(--border); }
+
+  .tab-btn {
+    min-height: 46px;
+    padding: 11px 16px;
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .tab-btn:hover,
+  .tab-btn.active { color: var(--text-1); }
+
+  .tab-btn.active { border-bottom-color: var(--accent); }
+
+  .tab-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--text-3) !important;
+  }
+
+  .tab-btn.active .tab-dot { background: var(--accent) !important; }
+
+  .panel { padding: 24px; }
+
+  .analysis-note-grid {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .analysis-note,
+  .comparison-card,
+  .chart-explainer {
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-1);
+  }
+
+  .analysis-note .title,
+  .comparison-card .title,
+  .chart-explainer .title {
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .comparison-cell {
+    padding: 10px;
+    background: rgba(255,255,255,.025);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+  }
+
+  .comparison-cell .lbl {
+    color: var(--text-2);
+    text-transform: none;
+  }
+
+  .comparison-cell .val { font-family: var(--font-mono); }
+
+  .chart-card {
+    background: #F5F6F7;
+    border: 1px solid #DADDE1;
+    border-radius: var(--radius-md);
+  }
+
+  .chart-topbar {
+    min-height: 48px;
+    padding: 11px 14px 0;
+  }
+
+  .chart-title {
+    color: #202124;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .chart-card .chart-download {
+    border-color: rgba(32,33,36,.16);
+    color: #5F6368;
+  }
+
+  .chart-card .chart-download:hover {
+    background: rgba(32,33,36,.06);
+    color: #202124;
+  }
+
+  .param-stats { gap: 8px; }
+
+  .pstat,
+  .metric-chip {
+    min-height: 64px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+  }
+
+  .pstat .lbl,
+  .metric-chip .lbl {
+    color: var(--text-2);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .pstat .val,
+  .metric-chip .val {
+    color: var(--text-1) !important;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .advanced-stats-details {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .advanced-stats-details summary {
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .info-text {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  #loading {
+    background: rgba(10,10,11,.88);
+    backdrop-filter: blur(5px);
+  }
+
+  #loading p {
+    color: var(--text-2);
+    font-family: var(--font-ui);
+    font-size: 12px;
+  }
+
+  .spinner {
+    width: 34px;
+    height: 34px;
+    border-color: var(--border-strong);
+    border-top-color: var(--accent);
+  }
+
+  #toast {
+    background: #211416;
+    border: 1px solid rgba(255,99,99,.25);
+    border-radius: var(--radius-md);
+    color: #FFAAAA;
+  }
+
+  body.presentation-mode {
+    --surface-2: #F4F5F7;
+    --surface2: var(--surface-2);
+    --border-strong: rgba(15,23,42,.18);
+    --text-1: #0F172A;
+    --text-2: #475569;
+    --text-3: #64748B;
+    --text: var(--text-1);
+    --muted: var(--text-2);
+    --accent-soft: rgba(37,99,235,.10);
+  }
+
+  @media(max-width: 900px) {
+    header {
+      min-height: 62px;
+      padding: 12px 16px;
+    }
+
+    header p { display: none; }
+    .badge { display: inline; }
+    .account-name { display: none; }
+    .account-summary::before { display: none; }
+    .account-summary { padding-right: 10px; }
+
+    #login-section { min-height: calc(100vh - 62px); }
+    .login-panel { padding: 26px 22px; }
+
+    #upload-section {
+      min-height: calc(100vh - 62px);
+      padding: 24px 14px 48px;
+    }
+
+    .source-grid { padding: 24px 20px; }
+    .source-switcher { width: 100%; }
+    .iseq-form { grid-template-columns: 1fr; }
+
+    .iseq-actions {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .parameter-chips {
+      grid-column: 1 / -1;
+      justify-content: flex-start;
+    }
+
+    .status-footer {
+      grid-template-columns: 8px minmax(0, 1fr);
+    }
+
+    .backend-details {
+      grid-column: 2;
+      justify-self: start;
+    }
+
+    main { padding: 20px 14px 48px; }
+
+    .stats-bar {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat-card + .stat-card { border-left: 0; }
+    .stat-card:nth-child(even) { border-left: 1px solid var(--border); }
+    .stat-card:nth-child(n+3) { border-top: 1px solid var(--border); }
+
+    .analysis-controls { padding: 20px; }
+    .control-grid { grid-template-columns: 1fr; }
+    .panel { padding: 18px; }
+  }
+
+  @media(max-width: 560px) {
+    .brand-copy p { display: none; }
+    .source-grid { padding: 22px 16px; }
+
+    .iseq-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .iseq-actions .btn,
+    .iseq-actions .chart-download {
+      width: 100%;
+    }
+
+    .parameter-chips { grid-column: 1; }
+    .stats-bar { grid-template-columns: 1fr; }
+    .stat-card:nth-child(even) { border-left: 0; }
+    .stat-card + .stat-card { border-top: 1px solid var(--border); }
+    .param-stats { grid-template-columns: repeat(2, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -827,20 +1724,20 @@
 
 <!-- Header -->
 <header>
-  <div class="logo">🌫</div>
-  <div>
+  <div class="logo" aria-hidden="true"><span>AQ</span></div>
+  <div class="brand-copy">
     <h1>AirQuality Dashboard</h1>
     <p>Análise estatística de qualidade do ar</p>
   </div>
   <div class="header-right">
-    <span class="badge">v3.0</span>
+    <span class="badge">v3.2</span>
     <div class="account-summary" id="workspace-actions" hidden>
       <span class="account-name" id="account-name"></span>
       <label class="icon-button" for="file-reopen" title="Carregar outro arquivo" aria-label="Carregar outro arquivo">
         +
         <input type="file" id="file-reopen" accept=".xlsx,.xls" multiple style="display:none"/>
       </label>
-      <button class="icon-button" id="logout-button" type="button" title="Sair" aria-label="Sair">↪</button>
+      <button class="icon-button logout-button" id="logout-button" type="button" title="Sair" aria-label="Sair">Sair</button>
     </div>
   </div>
 </header>
@@ -850,7 +1747,7 @@
   <div class="login-panel">
     <div class="login-kicker">Acesso aos sensores</div>
     <h2>Entrar com a conta ISEQ</h2>
-    <p>Seus ambientes e importações ficam vinculados somente a esta conta. A senha é usada apenas no login e não é armazenada.</p>
+    <p>A senha é usada somente para autenticar sua conta e não é armazenada.</p>
     <form class="login-form" id="login-form">
       <div class="field">
         <label for="iseq-login">Usuário ou e-mail</label>
@@ -868,31 +1765,35 @@
 
 <!-- Upload section -->
 <div id="upload-section">
-  <div class="source-grid">
+  <div class="source-grid" data-source-mode="iseq">
+    <div class="source-switcher" role="tablist" aria-label="Origem dos dados">
+      <button class="source-tab" id="source-tab-upload" type="button" role="tab" aria-controls="drop-zone" aria-selected="false" data-source-target="upload">Planilha</button>
+      <button class="source-tab active" id="source-tab-iseq" type="button" role="tab" aria-controls="iseq-source-panel" aria-selected="true" data-source-target="iseq">ISEQ</button>
+    </div>
     <div class="upload-card" id="drop-zone">
-      <div class="upload-icon">📊</div>
+      <div class="upload-icon" aria-hidden="true">↑</div>
       <h2>Carregar planilhas</h2>
-      <p>Use a planilha consolidada antiga ou selecione vários Excel do ISEQ, um por parâmetro.</p>
+      <p>Planilha consolidada ou exportações Excel do ISEQ.</p>
       <label class="btn" for="file-input">
-        ⬆ Selecionar Excel
+        Selecionar Excel
         <input type="file" id="file-input" accept=".xlsx,.xls" multiple/>
       </label>
       <p class="format-hint">Aceita aba Dados brutos ou exportações ISEQ da aba Dados</p>
     </div>
 
-    <div class="source-panel iseq-panel">
+    <div class="source-panel iseq-panel" id="iseq-source-panel">
       <h2>Buscar dados do ISEQ</h2>
-      <p>Cria uma tarefa no backend para baixar todos os parâmetros conhecidos e juntar o intervalo solicitado.</p>
+      <p>Selecione os dois sensores e o período da análise.</p>
       <form class="iseq-form" id="iseq-form">
         <input id="backend-url" type="hidden" value="http://127.0.0.1:8000"/>
         <div class="field">
-          <label for="environment-1">Ambiente 1</label>
+          <label for="environment-1">Ambiente 1 <span class="sensor-id" id="environment-1-mac"></span></label>
           <select id="environment-1">
             <option value="1C:69:20:C7:31:D8">Sensor 1 padrão (1C:69:20:C7:31:D8)</option>
           </select>
         </div>
         <div class="field">
-          <label for="environment-2">Ambiente 2</label>
+          <label for="environment-2">Ambiente 2 <span class="sensor-id" id="environment-2-mac"></span></label>
           <select id="environment-2">
             <option value="">Sem comparação</option>
           </select>
@@ -917,12 +1818,21 @@
           </select>
         </div>
         <div class="iseq-actions">
-          <button class="btn" type="submit">Buscar todos</button>
+          <button class="btn" type="submit">Buscar dados</button>
           <button class="chart-download" type="button" onclick="loadIseqEnvironments()">Atualizar ambientes</button>
-          <span class="info-text">CO2 · NOx · VOC · PM · Temp · Umid · Pressão</span>
+          <span class="parameter-chips" aria-label="Parâmetros disponíveis">
+            <span>CO₂</span><span>NOx</span><span>VOC</span><span>PM</span><span>Temp</span><span>Umid</span><span>Pressão</span>
+          </span>
         </div>
       </form>
-      <div class="status-box" id="iseq-status">Backend aguardando configuração.</div>
+      <div class="status-footer">
+        <span class="status-indicator" aria-hidden="true"></span>
+        <div class="status-box" id="iseq-status">Backend aguardando configuração.</div>
+        <details class="backend-details">
+          <summary>Detalhes técnicos</summary>
+          <code id="backend-technical-url"></code>
+        </details>
+      </div>
     </div>
   </div>
 </div>
@@ -1084,7 +1994,7 @@ const CHART_MEDIAN_COLOR = '#2F3440';
 
 const PLOT_LAYOUT_BASE = {
   paper_bgcolor:CHART_PAPER_BG, plot_bgcolor:CHART_PLOT_BG,
-  font:{ family:"'DM Sans', sans-serif", color:CHART_TEXT_COLOR, size:14 },
+  font:{ family:"'Inter', system-ui, sans-serif", color:CHART_TEXT_COLOR, size:14 },
   margin:{ t:20, b:64, l:72, r:18 },
   xaxis:{ gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, zerolinecolor:CHART_GRID_COLOR, automargin:true, tickfont:{size:13,color:CHART_TEXT_COLOR}, title:{font:{size:14,color:CHART_TEXT_COLOR}} },
   yaxis:{ gridcolor:CHART_GRID_COLOR, linecolor:CHART_AXIS_COLOR, zerolinecolor:CHART_GRID_COLOR, automargin:true, tickfont:{size:13,color:CHART_TEXT_COLOR}, title:{font:{size:14,color:CHART_TEXT_COLOR}} },
@@ -3668,6 +4578,7 @@ function populateIseqEnvironmentSelects(items) {
   env2.value = previous2 && macs.has(previous2) && previous2 !== env1.value
     ? previous2
     : firstOther;
+  updateEnvironmentMacLabels();
 }
 
 function selectedIseqEnvironment(selectId, fallbackLabel) {
@@ -3871,6 +4782,40 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function setSourceMode(mode) {
+  const sourceMode = mode === 'upload' ? 'upload' : 'iseq';
+  const sourceGrid = document.querySelector('.source-grid');
+  if(!sourceGrid) return;
+  sourceGrid.dataset.sourceMode = sourceMode;
+  document.querySelectorAll('.source-tab').forEach(button => {
+    const active = button.dataset.sourceTarget === sourceMode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
+  });
+}
+
+function updateEnvironmentMacLabels() {
+  [
+    ['environment-1', 'environment-1-mac'],
+    ['environment-2', 'environment-2-mac']
+  ].forEach(([selectId, labelId]) => {
+    const select = document.getElementById(selectId);
+    const label = document.getElementById(labelId);
+    if(label) label.textContent = normalizeMac(select?.value || '') || 'sem sensor';
+  });
+}
+
+function setupSourceInterface() {
+  document.querySelectorAll('.source-tab').forEach(button => {
+    button.addEventListener('click', () => setSourceMode(button.dataset.sourceTarget));
+  });
+  const technicalUrl = document.getElementById('backend-technical-url');
+  if(technicalUrl) technicalUrl.textContent = getBackendUrl();
+  updateEnvironmentMacLabels();
+  setSourceMode(document.querySelector('.source-grid')?.dataset.sourceMode || 'iseq');
+}
+
 // ═══════════════════════════════════════════════════════════
 // UI HELPERS
 // ═══════════════════════════════════════════════════════════
@@ -3898,6 +4843,7 @@ function showToast(msg, dur=5000) {
 
 document.getElementById('backend-url').value = DEFAULT_BACKEND_URL;
 setIseqStatus(`Usando ${backendModeLabel()}: ${getBackendUrl()}`, '');
+setupSourceInterface();
 document.getElementById('login-form').addEventListener('submit', submitIseqLogin);
 document.getElementById('logout-button').addEventListener('click', logoutSession);
 document.getElementById('iseq-form').addEventListener('submit', startIseqJob);
@@ -3907,7 +4853,9 @@ document.getElementById('environment-1')?.addEventListener('change', () => {
   if(env1 && env2 && env2.value === env1.value) {
     env2.value = ISEQ_EQUIPMENT.find(item => item.mac !== env1.value)?.mac || '';
   }
+  updateEnvironmentMacLabels();
 });
+document.getElementById('environment-2')?.addEventListener('change', updateEnvironmentMacLabels);
 initializeAuthentication();
 
 // Drag-and-drop
