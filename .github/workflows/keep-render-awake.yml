@@ -1,6 +1,9 @@
-name: Manter Render ativo durante importacao
+name: Manter backend Render ativo
 
 on:
+  schedule:
+    # Evita o inicio da hora, quando os agendamentos do GitHub costumam atrasar.
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -8,20 +11,27 @@ permissions:
 
 concurrency:
   group: keep-render-awake
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   keep-awake:
     runs-on: ubuntu-latest
-    timeout-minutes: 125
+    timeout-minutes: 5
     steps:
-      - name: Manter backend acordado por duas horas
+      - name: Consultar saude do backend
         shell: bash
         run: |
-          for attempt in $(seq 1 240); do
+          BACKEND_URL="https://iseq-export-backend.onrender.com"
+
+          if response="$(
             curl --fail --silent --show-error \
               --max-time 120 \
-              https://iseq-export-backend.onrender.com/api/health
-            echo
-            sleep 30
-          done
+              --retry 1 \
+              --retry-delay 5 \
+              --header "Cache-Control: no-cache" \
+              "${BACKEND_URL}/api/health"
+          )"; then
+            echo "${response}"
+          else
+            echo "::warning::Backend indisponivel. O Render pode estar iniciando ou suspenso por franquia."
+          fi
